@@ -3,7 +3,7 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - claude/new-project-m0hz8t
+      - main
 
 jobs:
   deploy:
