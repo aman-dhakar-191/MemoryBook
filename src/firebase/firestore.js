@@ -1,38 +1,49 @@
 import {
-  collection,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
+  collection, addDoc, updateDoc, deleteDoc,
+  doc, getDocs, orderBy, query, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './config'
 
-const COLLECTION = 'memories'
-
-export async function getMemories() {
-  const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'))
-  const snapshot = await getDocs(q)
-  return snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+export async function getAlbums() {
+  const snap = await getDocs(query(collection(db, 'albums'), orderBy('createdAt', 'desc')))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
 }
 
-export async function addMemory(data) {
-  return addDoc(collection(db, COLLECTION), {
-    ...data,
-    createdAt: serverTimestamp(),
+export async function createAlbum(title) {
+  const ref = await addDoc(collection(db, 'albums'), {
+    title, coverUrl: null, createdAt: serverTimestamp(),
+  })
+  return { id: ref.id, title, coverUrl: null }
+}
+
+export async function updateAlbum(id, data) {
+  return updateDoc(doc(db, 'albums', id), data)
+}
+
+export async function deleteAlbum(id) {
+  return deleteDoc(doc(db, 'albums', id))
+}
+
+export async function getPages(albumId) {
+  const snap = await getDocs(
+    query(collection(db, 'albums', albumId, 'pages'), orderBy('order', 'asc'))
+  )
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+export async function addPage(albumId, order) {
+  const ref = await addDoc(collection(db, 'albums', albumId, 'pages'), {
+    order, elements: [], background: '#fffdf8', createdAt: serverTimestamp(),
+  })
+  return { id: ref.id, order, elements: [], background: '#fffdf8' }
+}
+
+export async function updatePage(albumId, pageId, data) {
+  return updateDoc(doc(db, 'albums', albumId, 'pages', pageId), {
+    ...data, updatedAt: serverTimestamp(),
   })
 }
 
-export async function updateMemory(id, data) {
-  return updateDoc(doc(db, COLLECTION, id), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
-}
-
-export async function deleteMemory(id) {
-  return deleteDoc(doc(db, COLLECTION, id))
+export async function deletePage(albumId, pageId) {
+  return deleteDoc(doc(db, 'albums', albumId, 'pages', pageId))
 }
