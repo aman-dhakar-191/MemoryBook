@@ -6,7 +6,13 @@ export default function App() {
   const [album, setAlbum] = useState(null)
 
   if (album) {
-    return <BookView album={album} onBack={() => setAlbum(null)} />
+    return (
+      <BookView
+        album={album}
+        onBack={() => setAlbum(null)}
+        onAlbumUpdate={setAlbum}
+      />
+    )
   }
 
   return <AlbumsHome onOpen={setAlbum} />

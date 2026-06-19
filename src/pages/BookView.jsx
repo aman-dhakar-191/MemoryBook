@@ -1,6 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useCallback } from 'react'
 import HTMLFlipBook from 'react-pageflip'
-import { getPages, addPage } from '../firebase/firestore'
+import { useDropzone } from 'react-dropzone'
+import { getPages, addPage, updateAlbum } from '../firebase/firestore'
+import { uploadPhoto } from '../firebase/storage'
 import BookPage from '../components/BookPage'
 import PageEditor from './PageEditor'
 
@@ -14,11 +16,20 @@ const FlipPage = React.forwardRef(({ children, style }, ref) => (
 ))
 FlipPage.displayName = 'FlipPage'
 
-export default function BookView({ album, onBack }) {
+export default function BookView({ album, onBack, onAlbumUpdate }) {
   const bookRef = useRef()
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPage, setEditingPage] = useState(null)
+  const [coverUrl, setCoverUrl] = useState(album.coverUrl || null)
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
+
+  useEffect(() => {
+    const handle = () => setIsMobile(window.innerWidth < 700)
+    window.addEventListener('resize', handle)
+    return () => window.removeEventListener('resize', handle)
+  }, [])
 
   useEffect(() => {
     getPages(album.id).then(setPages).finally(() => setLoading(false))
@@ -34,6 +45,27 @@ export default function BookView({ album, onBack }) {
     setEditingPage(null)
   }
 
+  const onCoverDrop = useCallback(async accepted => {
+    const file = accepted[0]
+    if (!file) return
+    setUploadingCover(true)
+    try {
+      const { url } = await uploadPhoto(file)
+      setCoverUrl(url)
+      await updateAlbum(album.id, { coverUrl: url })
+      onAlbumUpdate?.({ ...album, coverUrl: url })
+    } finally {
+      setUploadingCover(false)
+    }
+  }, [album, onAlbumUpdate])
+
+  const { getInputProps: getCoverInputProps, open: openCoverPicker } = useDropzone({
+    onDrop: onCoverDrop,
+    accept: { 'image/*': [] },
+    noClick: true,
+    maxFiles: 1,
+  })
+
   if (editingPage) {
     return (
       <PageEditor
@@ -46,120 +78,105 @@ export default function BookView({ album, onBack }) {
   }
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#1a0f08' }}>
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#1a0f08' }}>
+      <input {...getCoverInputProps()} />
+
       {/* Top bar */}
-      <div
-        className="flex items-center justify-between px-6 py-3 shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
-      >
-        <button
-          onClick={onBack}
-          className="text-sm transition-colors"
-          style={{ color: '#fbbf24' }}
-        >
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
+      }}>
+        <button onClick={onBack} style={{ color: '#fbbf24', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
           ← Albums
         </button>
-        <h2
-          className="font-semibold"
-          style={{ fontFamily: 'Playfair Display, serif', color: '#fde68a' }}
-        >
-          {album.title}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontFamily: 'Playfair Display, serif', color: '#fde68a', fontSize: 15 }}>
+            {album.title}
+          </span>
+          <button
+            onClick={openCoverPicker}
+            disabled={uploadingCover}
+            style={{
+              fontSize: 11, color: '#c9a878',
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 6, padding: '4px 9px', cursor: 'pointer',
+            }}
+          >
+            {uploadingCover ? 'Uploading…' : '🖼️ Cover'}
+          </button>
+        </div>
         <button
           onClick={handleAddPage}
-          className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-          style={{ background: 'rgba(180,120,60,0.35)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.4)' }}
+          style={{
+            fontSize: 11, color: '#fde68a',
+            background: 'rgba(180,120,60,0.35)',
+            border: '1px solid rgba(180,120,60,0.4)',
+            borderRadius: 6, padding: '5px 11px', cursor: 'pointer',
+          }}
         >
           + Add Page
         </button>
       </div>
 
       {/* Book */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden py-6">
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '16px 8px' }}>
         {loading ? (
           <p style={{ color: 'rgba(253,230,138,0.4)' }}>Loading pages…</p>
         ) : (
           <HTMLFlipBook
-            key={pages.length}
+            key={`${pages.length}-${isMobile}`}
             ref={bookRef}
             width={PAGE_W}
             height={PAGE_H}
             size="fixed"
             showCover
-            flippingTime={650}
-            usePortrait={false}
+            flippingTime={600}
+            usePortrait={isMobile}
             drawShadow
             maxShadowOpacity={0.6}
-            style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.8)' }}
+            style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
           >
             {/* Front cover */}
-            <FlipPage
-              style={{
-                background: '#7c3a1e',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute', left: 0, top: 0, bottom: 0, width: 14,
-                  background: 'rgba(0,0,0,0.4)',
-                }}
-              />
-              {album.coverUrl ? (
-                <img
-                  src={album.coverUrl}
-                  alt=""
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+            <FlipPage style={{ background: '#7c3a1e', position: 'relative' }}>
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)', zIndex: 1 }} />
+              {coverUrl ? (
+                <img src={coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <div style={{ textAlign: 'center', padding: 40 }}>
-                  <div style={{ fontSize: 60, marginBottom: 28 }}>📖</div>
-                  <h2
-                    style={{
-                      fontFamily: 'Playfair Display, serif',
-                      fontSize: 28,
-                      color: '#fde68a',
-                      marginBottom: 12,
-                    }}
-                  >
+                <div style={{ textAlign: 'center', padding: '60px 32px 32px', color: 'rgba(255,220,150,0.7)' }}>
+                  <div style={{ fontSize: 56, marginBottom: 24 }}>📖</div>
+                  <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 26, color: '#fde68a', marginBottom: 16 }}>
                     {album.title}
                   </h2>
-                  <div
+                  <div style={{ width: 48, height: 2, background: 'rgba(253,230,138,0.3)', margin: '0 auto 28px' }} />
+                  <button
+                    onClick={openCoverPicker}
                     style={{
-                      width: 50, height: 2,
-                      background: 'rgba(253,230,138,0.35)',
-                      margin: '0 auto',
+                      fontSize: 13, color: '#fde68a',
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(253,230,138,0.3)',
+                      borderRadius: 10, padding: '10px 20px',
+                      cursor: 'pointer', width: '100%',
                     }}
-                  />
+                  >
+                    {uploadingCover ? 'Uploading…' : '+ Set Cover Photo'}
+                  </button>
                 </div>
               )}
             </FlipPage>
 
             {/* Content pages */}
             {pages.length === 0 ? (
-              <FlipPage
-                style={{
-                  background: '#fffdf8',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
+              <FlipPage style={{ background: '#fffdf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ textAlign: 'center', color: '#bbb' }}>
-                  <p style={{ fontSize: 13 }}>No pages yet</p>
-                  <p style={{ fontSize: 11, marginTop: 4 }}>Click “+ Add Page” to start</p>
+                  <div style={{ fontSize: 32, marginBottom: 10 }}>✨</div>
+                  <p style={{ fontSize: 13, fontWeight: 600 }}>No pages yet</p>
+                  <p style={{ fontSize: 11, marginTop: 4 }}>Tap “+ Add Page” to start</p>
                 </div>
               </FlipPage>
             ) : (
               pages.map((page, i) => (
-                <FlipPage
-                  key={page.id}
-                  style={{ background: page.background || '#fffdf8', position: 'relative' }}
-                >
+                <FlipPage key={page.id} style={{ background: page.background || '#fffdf8', position: 'relative' }}>
                   <BookPage
                     page={page}
                     pageNumber={i + 1}
@@ -173,41 +190,30 @@ export default function BookView({ album, onBack }) {
 
             {/* Back cover */}
             <FlipPage style={{ background: '#5c2d0e', position: 'relative' }}>
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: 0, bottom: 0, width: 14,
-                  background: 'rgba(0,0,0,0.4)',
-                }}
-              />
+              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)' }} />
             </FlipPage>
           </HTMLFlipBook>
         )}
       </div>
 
-      {/* Nav */}
-      <div className="flex items-center justify-center gap-6 pb-7 shrink-0">
+      {/* Nav buttons */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 20, padding: '12px 0 20px', flexShrink: 0 }}>
         <button
           onClick={() => bookRef.current?.pageFlip().flipPrev()}
-          className="px-8 py-2 rounded-full text-sm transition-colors"
           style={{
-            background: 'rgba(120,70,30,0.4)',
-            color: '#fde68a',
+            background: 'rgba(120,70,30,0.4)', color: '#fde68a',
             border: '1px solid rgba(180,120,60,0.3)',
+            borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer',
           }}
-        >
-          ◄ Prev
-        </button>
+        >◄ Prev</button>
         <button
           onClick={() => bookRef.current?.pageFlip().flipNext()}
-          className="px-8 py-2 rounded-full text-sm transition-colors"
           style={{
-            background: 'rgba(120,70,30,0.4)',
-            color: '#fde68a',
+            background: 'rgba(120,70,30,0.4)', color: '#fde68a',
             border: '1px solid rgba(180,120,60,0.3)',
+            borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer',
           }}
-        >
-          Next ►
-        </button>
+        >Next ►</button>
       </div>
     </div>
   )
