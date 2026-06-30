@@ -236,6 +236,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               position={{ x: el.x, y: el.y }}
               size={{ width: el.width, height: el.height }}
               bounds="parent"
+              lockAspectRatio={el.type === 'photo'}
               style={{
                 zIndex: index + 1,
                 outline: selectedId === el.id ? '2px solid #60a5fa' : 'none',
