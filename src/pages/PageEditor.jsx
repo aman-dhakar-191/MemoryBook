@@ -21,11 +21,21 @@ const BACKGROUNDS = [
 const FRAMES = ['none', 'classic', 'polaroid', 'vintage', 'rounded', 'gold']
 const FONTS = ['Inter', 'Playfair Display', 'Georgia', 'Courier New']
 
+function getImageDimensions(url) {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 200, h: 200 })
+    img.src = url
+  })
+}
+
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
   const [background, setBackground] = useState(page.background || '#fffdf8')
   const [selectedId, setSelectedId] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 })
   const [saving, setSaving] = useState(false)
 
   const selected = elements.find(e => e.id === selectedId)
@@ -52,28 +62,34 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   }
 
   const onDrop = useCallback(async accepted => {
-    const file = accepted[0]
-    if (!file) return
+    if (!accepted.length) return
     setUploading(true)
-    try {
-      const { url, path } = await uploadPhoto(file)
-      const el = {
+    setUploadCount({ done: 0, total: accepted.length })
+    const newEls = []
+    for (let i = 0; i < accepted.length; i++) {
+      const { url, path } = await uploadPhoto(accepted[i])
+      const { w, h } = await getImageDimensions(url)
+      const ratio = w / h
+      const maxW = 240, maxH = 220
+      let elW = maxW, elH = maxW / ratio
+      if (elH > maxH) { elH = maxH; elW = maxH * ratio }
+      newEls.push({
         id: uuid(), type: 'photo',
         imageUrl: url, storagePath: path, frame: 'none',
-        x: 40, y: 40, width: 200, height: 180, rotation: 0,
-      }
-      setElements(prev => [...prev, el])
-      setSelectedId(el.id)
-    } finally {
-      setUploading(false)
+        x: 30 + i * 22, y: 30 + i * 22,
+        width: Math.round(elW), height: Math.round(elH), rotation: 0,
+      })
+      setUploadCount({ done: i + 1, total: accepted.length })
     }
+    setElements(prev => [...prev, ...newEls])
+    setSelectedId(newEls[newEls.length - 1].id)
+    setUploading(false)
   }, [])
 
   const { getInputProps, open } = useDropzone({
     onDrop,
     accept: { 'image/*': [] },
     noClick: true,
-    maxFiles: 1,
     maxSize: 20 * 1024 * 1024,
   })
 
@@ -99,17 +115,14 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   }
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: '#0f0f0f' }}>
+    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0f0f0f' }}>
       {/* Toolbar */}
-      <div
-        className="flex items-center gap-2.5 px-4 py-2.5 shrink-0 flex-wrap"
-        style={{ background: '#1a1a1a', borderBottom: '1px solid #2a2a2a' }}
-      >
-        <button
-          onClick={onCancel}
-          style={{ color: '#888', fontSize: 13 }}
-          className="hover:text-white transition-colors mr-1"
-        >
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+        background: '#1a1a1a', borderBottom: '1px solid #2a2a2a',
+        flexWrap: 'wrap', flexShrink: 0,
+      }}>
+        <button onClick={onCancel} style={{ color: '#888', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', marginRight: 4 }}>
           ← Back
         </button>
         <div style={{ width: 1, height: 18, background: '#333' }} />
@@ -118,22 +131,20 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         <button
           onClick={open}
           disabled={uploading}
-          className="text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-          style={{ background: '#1d4ed8', color: 'white' }}
+          style={{ background: '#1d4ed8', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, padding: '5px 10px', cursor: 'pointer', opacity: uploading ? 0.6 : 1 }}
         >
-          {uploading ? 'Uploading…' : '+ Photo'}
+          {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}…` : '+ Photos'}
         </button>
 
         <button
           onClick={addText}
-          className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-          style={{ background: '#7c3aed', color: 'white' }}
+          style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, padding: '5px 10px', cursor: 'pointer' }}
         >
           + Text
         </button>
 
         {/* Background */}
-        <div className="flex items-center gap-1.5">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span style={{ color: '#555', fontSize: 11 }}>BG</span>
           {BACKGROUNDS.map(bg => (
             <button
@@ -141,12 +152,10 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               title={bg.label}
               onClick={() => setBackground(bg.color)}
               style={{
-                width: 18, height: 18,
-                borderRadius: '50%',
-                background: bg.color,
+                width: 18, height: 18, borderRadius: '50%', background: bg.color,
                 border: background === bg.color ? '2px solid white' : '2px solid #444',
                 transform: background === bg.color ? 'scale(1.3)' : 'scale(1)',
-                transition: 'all 0.15s',
+                transition: 'all 0.15s', cursor: 'pointer',
               }}
             />
           ))}
@@ -156,120 +165,68 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         {selected && (
           <>
             <div style={{ width: 1, height: 18, background: '#333' }} />
-
             {selected.type === 'photo' && (
               <select
                 value={selected.frame}
                 onChange={e => updateEl(selected.id, { frame: e.target.value })}
-                style={{
-                  background: '#252525', color: 'white',
-                  border: '1px solid #333', borderRadius: 6,
-                  fontSize: 11, padding: '3px 6px',
-                }}
+                style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 6px' }}
               >
                 {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
             )}
-
             {selected.type === 'text' && (
               <>
                 <select
                   value={selected.fontFamily}
                   onChange={e => updateEl(selected.id, { fontFamily: e.target.value })}
-                  style={{
-                    background: '#252525', color: 'white',
-                    border: '1px solid #333', borderRadius: 6,
-                    fontSize: 11, padding: '3px 6px',
-                  }}
+                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 6px' }}
                 >
                   {FONTS.map(f => <option key={f}>{f}</option>)}
                 </select>
                 <input
-                  type="number"
-                  value={selected.fontSize}
-                  min={10} max={96}
+                  type="number" value={selected.fontSize} min={10} max={96}
                   onChange={e => updateEl(selected.id, { fontSize: Number(e.target.value) })}
-                  title="Font size"
-                  style={{
-                    width: 52, background: '#252525', color: 'white',
-                    border: '1px solid #333', borderRadius: 6,
-                    fontSize: 11, padding: '3px 6px',
-                  }}
+                  style={{ width: 48, background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}
                 />
                 <input
-                  type="color"
-                  value={selected.color}
+                  type="color" value={selected.color}
                   onChange={e => updateEl(selected.id, { color: e.target.value })}
                   style={{ width: 26, height: 26, border: 'none', cursor: 'pointer', borderRadius: 4 }}
                 />
               </>
             )}
-
-            <div className="flex items-center gap-1">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <span style={{ color: '#555', fontSize: 11 }}>°</span>
               <input
-                type="number"
-                value={selected.rotation || 0}
-                min={-180} max={180}
+                type="number" value={selected.rotation || 0} min={-180} max={180}
                 onChange={e => updateEl(selected.id, { rotation: Number(e.target.value) })}
-                title="Rotation"
-                style={{
-                  width: 52, background: '#252525', color: 'white',
-                  border: '1px solid #333', borderRadius: 6,
-                  fontSize: 11, padding: '3px 6px',
-                }}
+                style={{ width: 48, background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}
               />
             </div>
-
-            <button
-              onClick={() => move(-1)}
-              title="Send back"
-              style={{ color: '#666', fontSize: 13, padding: '2px 5px' }}
-              className="hover:text-white transition-colors"
-            >
-              ↓
-            </button>
-            <button
-              onClick={() => move(1)}
-              title="Bring forward"
-              style={{ color: '#666', fontSize: 13, padding: '2px 5px' }}
-              className="hover:text-white transition-colors"
-            >
-              ↑
-            </button>
-            <button
-              onClick={deleteSelected}
-              style={{ color: '#ef4444', fontSize: 12, padding: '2px 5px' }}
-              className="hover:opacity-70 transition-opacity"
-            >
-              ✕
-            </button>
+            <button onClick={() => move(-1)} title="Send back" style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>↓</button>
+            <button onClick={() => move(1)} title="Bring forward" style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>↑</button>
+            <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>✕</button>
           </>
         )}
 
         <button
           onClick={handleSave}
           disabled={saving}
-          className="text-sm px-5 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-40"
-          style={{ background: '#16a34a', color: 'white', marginLeft: 'auto' }}
+          style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, padding: '5px 16px', fontWeight: 600, cursor: 'pointer', marginLeft: 'auto', opacity: saving ? 0.5 : 1 }}
         >
-          {saving ? 'Saving…' : 'Save Page'}
+          {saving ? 'Saving…' : 'Save'}
         </button>
       </div>
 
       {/* Canvas */}
       <div
-        className="flex-1 flex items-center justify-center overflow-auto"
+        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
         onClick={() => setSelectedId(null)}
       >
         <div
           style={{
-            position: 'relative',
-            width: PAGE_W,
-            height: PAGE_H,
-            background,
-            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-            flexShrink: 0,
+            position: 'relative', width: PAGE_W, height: PAGE_H,
+            background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0,
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -286,48 +243,27 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               }}
               onDragStop={(_, d) => updateEl(el.id, { x: d.x, y: d.y })}
               onResizeStop={(_, __, ref, ___, pos) =>
-                updateEl(el.id, {
-                  width: ref.offsetWidth,
-                  height: ref.offsetHeight,
-                  x: pos.x,
-                  y: pos.y,
-                })
+                updateEl(el.id, { width: ref.offsetWidth, height: ref.offsetHeight, x: pos.x, y: pos.y })
               }
               onClick={e => { e.stopPropagation(); setSelectedId(el.id) }}
             >
-              <div
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
-                }}
-              >
+              <div style={{ width: '100%', height: '100%', transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined }}>
                 {el.type === 'photo' && (
                   <img
-                    src={el.imageUrl}
-                    alt=""
-                    className={`w-full h-full object-cover frame-${el.frame || 'none'}`}
+                    src={el.imageUrl} alt=""
+                    className={`frame-${el.frame || 'none'}`}
                     draggable={false}
-                    style={{ pointerEvents: 'none', display: 'block' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
                   />
                 )}
                 {el.type === 'text' && (
                   <div
-                    contentEditable
-                    suppressContentEditableWarning
+                    contentEditable suppressContentEditableWarning
                     onBlur={e => updateEl(el.id, { content: e.currentTarget.textContent || '' })}
                     style={{
-                      fontSize: el.fontSize,
-                      color: el.color,
-                      fontFamily: el.fontFamily,
-                      width: '100%',
-                      height: '100%',
-                      outline: 'none',
-                      cursor: 'text',
-                      overflow: 'hidden',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      lineHeight: 1.6,
+                      fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
+                      width: '100%', height: '100%', outline: 'none', cursor: 'text',
+                      overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
                     }}
                   >
                     {el.content}

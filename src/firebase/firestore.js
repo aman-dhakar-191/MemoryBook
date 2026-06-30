@@ -20,8 +20,10 @@ export async function updateAlbum(id, data) {
   return updateDoc(doc(db, 'albums', id), data)
 }
 
-export async function deleteAlbum(id) {
-  return deleteDoc(doc(db, 'albums', id))
+export async function deleteAlbumWithPages(albumId) {
+  const pagesSnap = await getDocs(collection(db, 'albums', albumId, 'pages'))
+  await Promise.all(pagesSnap.docs.map(d => deleteDoc(d.ref)))
+  await deleteDoc(doc(db, 'albums', albumId))
 }
 
 export async function getPages(albumId) {

@@ -25,8 +25,9 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
             <img
               src={el.imageUrl}
               alt=""
-              className={`w-full h-full object-cover frame-${el.frame || 'none'}`}
+              className={`frame-${el.frame || 'none'}`}
               draggable={false}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             />
           )}
           {el.type === 'text' && (
@@ -46,7 +47,6 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
         </div>
       ))}
 
-      {/* Page number */}
       <div style={{
         position: 'absolute', bottom: 10, width: '100%',
         textAlign: 'center', fontSize: 10, color: '#ccc',
@@ -55,26 +55,15 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
         {pageNumber}
       </div>
 
-      {/* Edit button — prominent, bottom right */}
       <button
         onClick={onEdit}
         style={{
-          position: 'absolute',
-          bottom: 16,
-          right: 12,
-          background: 'rgba(0,0,0,0.55)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 18,
-          padding: '7px 16px',
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 5,
-          letterSpacing: '0.02em',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          position: 'absolute', bottom: 16, right: 12,
+          background: 'rgba(0,0,0,0.55)', color: '#fff',
+          border: 'none', borderRadius: 18,
+          padding: '7px 16px', fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', display: 'flex', alignItems: 'center',
+          gap: 5, boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}
       >
         ✏️ Edit

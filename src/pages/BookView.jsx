@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { useDropzone } from 'react-dropzone'
-import { getPages, addPage, updateAlbum } from '../firebase/firestore'
+import { getPages, addPage, updateAlbum, deleteAlbumWithPages } from '../firebase/firestore'
 import { uploadPhoto } from '../firebase/storage'
 import BookPage from '../components/BookPage'
 import PageEditor from './PageEditor'
@@ -24,6 +24,8 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
   const [coverUrl, setCoverUrl] = useState(album.coverUrl || null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -43,6 +45,16 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
   function handlePageSaved(updated) {
     setPages(prev => prev.map(p => p.id === updated.id ? updated : p))
     setEditingPage(null)
+  }
+
+  async function handleDeleteAlbum() {
+    setDeleting(true)
+    try {
+      await deleteAlbumWithPages(album.id)
+      onBack()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const onCoverDrop = useCallback(async accepted => {
@@ -89,7 +101,8 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
         <button onClick={onBack} style={{ color: '#fbbf24', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
           ← Albums
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: 'Playfair Display, serif', color: '#fde68a', fontSize: 15 }}>
             {album.title}
           </span>
@@ -106,17 +119,41 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
             {uploadingCover ? 'Uploading…' : '🖼️ Cover'}
           </button>
         </div>
-        <button
-          onClick={handleAddPage}
-          style={{
-            fontSize: 11, color: '#fde68a',
-            background: 'rgba(180,120,60,0.35)',
-            border: '1px solid rgba(180,120,60,0.4)',
-            borderRadius: 6, padding: '5px 11px', cursor: 'pointer',
-          }}
-        >
-          + Add Page
-        </button>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {confirmDelete ? (
+            <>
+              <button
+                onClick={handleDeleteAlbum}
+                disabled={deleting}
+                style={{ fontSize: 11, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}
+              >
+                {deleting ? 'Deleting…' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{ fontSize: 11, color: '#aaa', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setConfirmDelete(true)}
+                style={{ fontSize: 11, color: '#f87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
+              >
+                🗑 Delete
+              </button>
+              <button
+                onClick={handleAddPage}
+                style={{ fontSize: 11, color: '#fde68a', background: 'rgba(180,120,60,0.35)', border: '1px solid rgba(180,120,60,0.4)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}
+              >
+                + Add Page
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Book */}
@@ -143,21 +180,13 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
               {coverUrl ? (
                 <img src={coverUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <div style={{ textAlign: 'center', padding: '60px 32px 32px', color: 'rgba(255,220,150,0.7)' }}>
+                <div style={{ textAlign: 'center', padding: '60px 32px 32px' }}>
                   <div style={{ fontSize: 56, marginBottom: 24 }}>📖</div>
-                  <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 26, color: '#fde68a', marginBottom: 16 }}>
-                    {album.title}
-                  </h2>
+                  <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 26, color: '#fde68a', marginBottom: 16 }}>{album.title}</h2>
                   <div style={{ width: 48, height: 2, background: 'rgba(253,230,138,0.3)', margin: '0 auto 28px' }} />
                   <button
                     onClick={openCoverPicker}
-                    style={{
-                      fontSize: 13, color: '#fde68a',
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(253,230,138,0.3)',
-                      borderRadius: 10, padding: '10px 20px',
-                      cursor: 'pointer', width: '100%',
-                    }}
+                    style={{ fontSize: 13, color: '#fde68a', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(253,230,138,0.3)', borderRadius: 10, padding: '10px 20px', cursor: 'pointer', width: '100%' }}
                   >
                     {uploadingCover ? 'Uploading…' : '+ Set Cover Photo'}
                   </button>
@@ -196,23 +225,15 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
         )}
       </div>
 
-      {/* Nav buttons */}
+      {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, padding: '12px 0 20px', flexShrink: 0 }}>
         <button
           onClick={() => bookRef.current?.pageFlip().flipPrev()}
-          style={{
-            background: 'rgba(120,70,30,0.4)', color: '#fde68a',
-            border: '1px solid rgba(180,120,60,0.3)',
-            borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer',
-          }}
+          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}
         >◄ Prev</button>
         <button
           onClick={() => bookRef.current?.pageFlip().flipNext()}
-          style={{
-            background: 'rgba(120,70,30,0.4)', color: '#fde68a',
-            border: '1px solid rgba(180,120,60,0.3)',
-            borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer',
-          }}
+          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}
         >Next ►</button>
       </div>
     </div>
