@@ -102,6 +102,15 @@ const FILTERS = [
 
 const FONTS = ['Inter', 'Playfair Display', 'Georgia', 'Courier New']
 
+const STICKERS = [
+  '😀','😂','🥹','😍','🥰','😎','🤩','🥳','😭','😱','😜','😘',
+  '❤️','🧡','💛','💚','💙','💜','🖤','🤍','💕','💗','🫶','💝',
+  '🌸','🌺','🌻','🌹','🌼','🍀','🌿','🌙','⭐','🌈','☀️','❄️',
+  '🎉','🎊','🎁','🎈','🎀','🏆','✨','🔥','💫','🎵','🎶','🎂',
+  '🐱','🐶','🦊','🐻','🐼','🦁','🦋','🦄','🐸','🐧','🐨','🐯',
+  '✈️','🚀','🏖️','🏔️','🌊','🌴','🍕','🍦','🥂','🎆','🎭','🌍',
+]
+
 function getImageDimensions(url) {
   return new Promise(resolve => {
     const img = new Image()
@@ -132,6 +141,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 })
   const [saving, setSaving] = useState(false)
   const [showLayouts, setShowLayouts] = useState(false)
+  const [showStickers, setShowStickers] = useState(false)
   const placeholderInputRef = useRef(null)
   const placeholderTarget = useRef(null)
 
@@ -159,7 +169,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   function applyLayout(layout) {
     const photos = elements.filter(e => e.type === 'photo')
-    const texts = elements.filter(e => e.type === 'text')
+    const texts = elements.filter(e => e.type === 'text' || e.type === 'emoji')
     const newEls = layout.slots.map((s, i) =>
       i < photos.length
         ? { ...photos[i], x: s.x, y: s.y, width: s.w, height: s.h }
@@ -178,7 +188,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     e.target.value = ''
     setUploading(true)
     try {
-      const { url, path } = await uploadPhoto(file)
+      const { url, path } = await uploadPhoto(file, null, `memorybook/${album.id}`)
       setElements(prev => prev.map(el =>
         el.id === id ? { ...el, type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none' } : el
       ))
@@ -194,7 +204,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setUploadCount({ done: 0, total: accepted.length })
     const newEls = []
     for (let i = 0; i < accepted.length; i++) {
-      const { url, path } = await uploadPhoto(accepted[i])
+      const { url, path } = await uploadPhoto(accepted[i], null, `memorybook/${album.id}`)
       const { w, h } = await getImageDimensions(url)
       const ratio = w / h
       const maxW = 240, maxH = 220
@@ -210,7 +220,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setElements(prev => [...prev, ...newEls])
     setSelectedId(newEls[newEls.length - 1]?.id ?? null)
     setUploading(false)
-  }, [])
+  }, [album.id])
 
   const { getInputProps, open } = useDropzone({ onDrop, accept: { 'image/*': [] }, noClick: true, maxSize: 20 * 1024 * 1024 })
 
@@ -219,6 +229,13 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setElements(prev => [...prev, el])
     setSelectedId(el.id)
     setEditingId(el.id)
+  }
+
+  function addEmoji(emoji) {
+    const el = { id: uuid(), type: 'emoji', content: emoji, x: 160, y: 220, width: 80, height: 80, rotation: 0 }
+    setElements(prev => [...prev, el])
+    setSelectedId(el.id)
+    setShowStickers(false)
   }
 
   async function handleSave() {
@@ -249,9 +266,31 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         </button>
         <button onClick={addText} style={btn({ background: '#7c3aed', color: 'white' })}>+ Text</button>
 
+        {/* Sticker picker */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => { setShowStickers(v => !v); setShowLayouts(false) }} style={btn({ background: '#b45309', color: 'white' })}>😊 Sticker</button>
+          {showStickers && (
+            <div
+              style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', width: 252 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, maxHeight: 220, overflowY: 'auto' }}>
+                {STICKERS.map((emoji, i) => (
+                  <button key={i} onClick={() => addEmoji(emoji)}
+                    style={{ background: 'none', border: 'none', fontSize: 26, cursor: 'pointer', padding: '4px 2px', borderRadius: 6, lineHeight: 1 }}
+                    title={emoji}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Layout picker */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setShowLayouts(v => !v)} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
+          <button onClick={() => { setShowLayouts(v => !v); setShowStickers(false) }} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
           {showLayouts && (
             <div
               style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', width: 340 }}
@@ -327,7 +366,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
       {/* Canvas */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
-        onClick={() => { setSelectedId(null); setEditingId(null); setShowLayouts(false) }}>
+        onClick={() => { setSelectedId(null); setEditingId(null); setShowLayouts(false); setShowStickers(false) }}>
         <div style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
           onClick={e => e.stopPropagation()}>
           {elements.map((el, index) => (
@@ -365,6 +404,16 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   <div style={{ width: '100%', height: '100%', border: '2px dashed #bbb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', userSelect: 'none' }}>
                     <div style={{ fontSize: 26, color: '#bbb', lineHeight: 1 }}>+</div>
                     <div style={{ fontSize: 10, color: '#bbb', marginTop: 5 }}>Tap to add photo</div>
+                  </div>
+                )}
+                {el.type === 'emoji' && (
+                  <div style={{
+                    width: '100%', height: '100%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: Math.min(el.width, el.height) * 0.8,
+                    lineHeight: 1, userSelect: 'none', cursor: 'default',
+                  }}>
+                    {el.content}
                   </div>
                 )}
                 {el.type === 'text' && (

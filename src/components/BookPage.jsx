@@ -12,6 +12,16 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
           {el.type === 'placeholder' && (
             <div style={{ width: '100%', height: '100%', border: '1.5px dashed #ddd', background: 'rgba(0,0,0,0.015)' }} />
           )}
+          {el.type === 'emoji' && (
+            <div style={{
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: Math.min(el.width, el.height) * 0.8,
+              lineHeight: 1, userSelect: 'none',
+            }}>
+              {el.content}
+            </div>
+          )}
           {el.type === 'text' && (
             <div style={{ fontSize: el.fontSize || 16, color: el.color || '#333', fontFamily: el.fontFamily || 'Inter, sans-serif', width: '100%', height: '100%', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
               {el.content}
