@@ -86,7 +86,20 @@ const BACKGROUNDS = [
   { color: '#f0fdf4', label: 'Mint' },
   { color: '#1e1e2e', label: 'Night' },
 ]
-const FRAMES = ['none', 'classic', 'polaroid', 'vintage', 'rounded', 'gold']
+
+const FRAMES = ['none', 'classic', 'polaroid', 'vintage', 'rounded', 'gold', 'shadow', 'thin', 'film', 'double']
+
+const FILTERS = [
+  { id: 'none',     label: 'Normal'   },
+  { id: 'bw',      label: 'B&W'      },
+  { id: 'sepia',   label: 'Sepia'    },
+  { id: 'warm',    label: 'Warm'     },
+  { id: 'cool',    label: 'Cool'     },
+  { id: 'faded',   label: 'Faded'    },
+  { id: 'vivid',   label: 'Vivid'    },
+  { id: 'dramatic',label: 'Dramatic' },
+]
+
 const FONTS = ['Inter', 'Playfair Display', 'Georgia', 'Courier New']
 
 function getImageDimensions(url) {
@@ -114,6 +127,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
   const [background, setBackground] = useState(page.background || '#fffdf8')
   const [selectedId, setSelectedId] = useState(null)
+  const [editingId, setEditingId] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 })
   const [saving, setSaving] = useState(false)
@@ -129,6 +143,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   function deleteSelected() {
     setElements(prev => prev.filter(e => e.id !== selectedId))
     setSelectedId(null)
+    setEditingId(null)
   }
   function move(dir) {
     setElements(prev => {
@@ -152,6 +167,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     )
     setElements([...texts, ...newEls])
     setSelectedId(null)
+    setEditingId(null)
     setShowLayouts(false)
   }
 
@@ -164,7 +180,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     try {
       const { url, path } = await uploadPhoto(file)
       setElements(prev => prev.map(el =>
-        el.id === id ? { ...el, type: 'photo', imageUrl: url, storagePath: path, frame: 'none' } : el
+        el.id === id ? { ...el, type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none' } : el
       ))
     } finally {
       setUploading(false)
@@ -185,7 +201,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       let elW = maxW, elH = maxW / ratio
       if (elH > maxH) { elH = maxH; elW = maxH * ratio }
       newEls.push({
-        id: uuid(), type: 'photo', imageUrl: url, storagePath: path, frame: 'none',
+        id: uuid(), type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none',
         x: 30 + i * 22, y: 30 + i * 22,
         width: Math.round(elW), height: Math.round(elH), rotation: 0,
       })
@@ -199,13 +215,15 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const { getInputProps, open } = useDropzone({ onDrop, accept: { 'image/*': [] }, noClick: true, maxSize: 20 * 1024 * 1024 })
 
   function addText() {
-    const el = { id: uuid(), type: 'text', content: 'Write here…', fontSize: 18, color: '#333', fontFamily: 'Inter', x: 60, y: 60, width: 240, height: 80, rotation: 0 }
+    const el = { id: uuid(), type: 'text', content: '', fontSize: 18, color: '#333', fontFamily: 'Inter', x: 60, y: 60, width: 240, height: 80, rotation: 0 }
     setElements(prev => [...prev, el])
     setSelectedId(el.id)
+    setEditingId(el.id)
   }
 
   async function handleSave() {
     setSaving(true)
+    setEditingId(null)
     try {
       await updatePage(album.id, page.id, { elements, background })
       onSave({ ...page, elements, background })
@@ -264,15 +282,21 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
           ))}
         </div>
 
-        {/* Selected controls */}
+        {/* Selected element controls */}
         {selected && (
           <>
             <div style={{ width: 1, height: 18, background: '#333' }} />
             {selected.type === 'photo' && (
-              <select value={selected.frame} onChange={e => updateEl(selected.id, { frame: e.target.value })}
-                style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
-                {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
+              <>
+                <select value={selected.frame || 'none'} onChange={e => updateEl(selected.id, { frame: e.target.value })}
+                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
+                  {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+                <select value={selected.filter || 'none'} onChange={e => updateEl(selected.id, { filter: e.target.value })}
+                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
+                  {FILTERS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
+              </>
             )}
             {selected.type === 'text' && (
               <>
@@ -303,7 +327,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
       {/* Canvas */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
-        onClick={() => { setSelectedId(null); setShowLayouts(false) }}>
+        onClick={() => { setSelectedId(null); setEditingId(null); setShowLayouts(false) }}>
         <div style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
           onClick={e => e.stopPropagation()}>
           {elements.map((el, index) => (
@@ -312,16 +336,29 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               size={{ width: el.width, height: el.height }}
               bounds="parent"
               lockAspectRatio={el.type === 'photo'}
-              disableDragging={el.type === 'placeholder'}
-              enableResizing={el.type !== 'placeholder'}
+              disableDragging={el.type === 'placeholder' || editingId === el.id}
+              enableResizing={el.type !== 'placeholder' && editingId !== el.id}
               style={{ zIndex: index + 1, outline: selectedId === el.id ? '2px solid #60a5fa' : 'none', outlineOffset: 2 }}
               onDragStop={(_, d) => updateEl(el.id, { x: d.x, y: d.y })}
               onResizeStop={(_, __, ref, ___, pos) => updateEl(el.id, { width: ref.offsetWidth, height: ref.offsetHeight, x: pos.x, y: pos.y })}
-              onClick={e => { e.stopPropagation(); if (el.type === 'placeholder') { placeholderTarget.current = el.id; placeholderInputRef.current?.click() } else setSelectedId(el.id) }}
+              onClick={e => {
+                e.stopPropagation()
+                if (el.type === 'placeholder') {
+                  placeholderTarget.current = el.id
+                  placeholderInputRef.current?.click()
+                } else if (el.type === 'text' && selectedId === el.id) {
+                  setEditingId(el.id)
+                } else {
+                  setSelectedId(el.id)
+                  setEditingId(null)
+                }
+              }}
             >
               <div style={{ width: '100%', height: '100%', transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined }}>
                 {el.type === 'photo' && (
-                  <img src={el.imageUrl} alt="" className={`frame-${el.frame || 'none'}`} draggable={false}
+                  <img src={el.imageUrl} alt=""
+                    className={`frame-${el.frame || 'none'} filter-${el.filter || 'none'}`}
+                    draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
                 )}
                 {el.type === 'placeholder' && (
@@ -331,11 +368,32 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   </div>
                 )}
                 {el.type === 'text' && (
-                  <div contentEditable suppressContentEditableWarning
-                    onBlur={e => updateEl(el.id, { content: e.currentTarget.textContent || '' })}
-                    style={{ fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, width: '100%', height: '100%', outline: 'none', cursor: 'text', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
-                    {el.content}
-                  </div>
+                  editingId === el.id ? (
+                    <textarea
+                      autoFocus
+                      value={el.content}
+                      onChange={e => updateEl(el.id, { content: e.target.value })}
+                      onBlur={() => setEditingId(null)}
+                      onClick={e => e.stopPropagation()}
+                      placeholder="Type here…"
+                      style={{
+                        width: '100%', height: '100%',
+                        fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
+                        background: 'transparent', border: 'none', outline: 'none',
+                        resize: 'none', cursor: 'text', lineHeight: 1.6, padding: 0,
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
+                      width: '100%', height: '100%', overflow: 'hidden',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
+                      userSelect: 'none', cursor: 'text',
+                    }}>
+                      {el.content || <span style={{ color: '#888', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to select · tap again to type</span>}
+                    </div>
+                  )
                 )}
               </div>
             </Rnd>

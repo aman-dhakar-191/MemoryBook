@@ -4,7 +4,9 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
       {(page.elements || []).map(el => (
         <div key={el.id} style={{ position: 'absolute', left: el.x, top: el.y, width: el.width, height: el.height, transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined, pointerEvents: 'none' }}>
           {el.type === 'photo' && (
-            <img src={el.imageUrl} alt="" className={`frame-${el.frame || 'none'}`} draggable={false}
+            <img src={el.imageUrl} alt=""
+              className={`frame-${el.frame || 'none'} filter-${el.filter || 'none'}`}
+              draggable={false}
               style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
           )}
           {el.type === 'placeholder' && (
