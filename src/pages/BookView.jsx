@@ -62,7 +62,7 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
     if (!file) return
     setUploadingCover(true)
     try {
-      const { url } = await uploadPhoto(file)
+      const { url } = await uploadPhoto(file, null, `memorybook/${album.id}`)
       setCoverUrl(url)
       await updateAlbum(album.id, { coverUrl: url })
       onAlbumUpdate?.({ ...album, coverUrl: url })
@@ -200,7 +200,7 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
                 <div style={{ textAlign: 'center', color: '#bbb' }}>
                   <div style={{ fontSize: 32, marginBottom: 10 }}>✨</div>
                   <p style={{ fontSize: 13, fontWeight: 600 }}>No pages yet</p>
-                  <p style={{ fontSize: 11, marginTop: 4 }}>Tap “+ Add Page” to start</p>
+                  <p style={{ fontSize: 11, marginTop: 4 }}>Tap "+ Add Page" to start</p>
                 </div>
               </FlipPage>
             ) : (
