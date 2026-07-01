@@ -132,6 +132,10 @@ function LayoutPreview({ slots }) {
   )
 }
 
+function dismissKeyboard() {
+  document.activeElement?.blur()
+}
+
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
   const [background, setBackground] = useState(page.background || '#fffdf8')
@@ -146,6 +150,18 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const placeholderTarget = useRef(null)
 
   const selected = elements.find(e => e.id === selectedId)
+
+  function closePopovers() {
+    setShowLayouts(false)
+    setShowStickers(false)
+  }
+
+  function deselect() {
+    dismissKeyboard()
+    setSelectedId(null)
+    setEditingId(null)
+    closePopovers()
+  }
 
   function updateEl(id, patch) {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
@@ -239,6 +255,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   }
 
   async function handleSave() {
+    dismissKeyboard()
     setSaving(true)
     setEditingId(null)
     try {
@@ -278,7 +295,6 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                 {STICKERS.map((emoji, i) => (
                   <button key={i} onClick={() => addEmoji(emoji)}
                     style={{ background: 'none', border: 'none', fontSize: 26, cursor: 'pointer', padding: '4px 2px', borderRadius: 6, lineHeight: 1 }}
-                    title={emoji}
                   >
                     {emoji}
                   </button>
@@ -364,11 +380,16 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         </button>
       </div>
 
-      {/* Canvas */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
-        onClick={() => { setSelectedId(null); setEditingId(null); setShowLayouts(false); setShowStickers(false) }}>
-        <div style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
-          onClick={e => e.stopPropagation()}>
+      {/* Canvas scroll area — tapping the dark gutter deselects */}
+      <div
+        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
+        onClick={deselect}
+      >
+        {/* Page canvas — tapping empty page area also deselects/blurs */}
+        <div
+          style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
+          onClick={e => { e.stopPropagation(); deselect() }}
+        >
           {elements.map((el, index) => (
             <Rnd key={el.id}
               position={{ x: el.x, y: el.y }}
@@ -385,7 +406,9 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                 if (el.type === 'placeholder') {
                   placeholderTarget.current = el.id
                   placeholderInputRef.current?.click()
-                } else if (el.type === 'text' && selectedId === el.id) {
+                } else if (el.type === 'text') {
+                  // Single tap: select + immediately enter edit mode
+                  setSelectedId(el.id)
                   setEditingId(el.id)
                 } else {
                   setSelectedId(el.id)
@@ -422,7 +445,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                       autoFocus
                       value={el.content}
                       onChange={e => updateEl(el.id, { content: e.target.value })}
-                      onBlur={() => setEditingId(null)}
+                      onBlur={() => setEditingId(prev => prev === el.id ? null : prev)}
                       onClick={e => e.stopPropagation()}
                       placeholder="Type here…"
                       style={{
@@ -440,7 +463,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                       whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
                       userSelect: 'none', cursor: 'text',
                     }}>
-                      {el.content || <span style={{ color: '#888', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to select · tap again to type</span>}
+                      {el.content || <span style={{ color: '#888', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
                     </div>
                   )
                 )}
