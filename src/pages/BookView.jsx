@@ -123,32 +123,23 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {confirmDelete ? (
             <>
-              <button
-                onClick={handleDeleteAlbum}
-                disabled={deleting}
-                style={{ fontSize: 11, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}
-              >
+              <button onClick={handleDeleteAlbum} disabled={deleting}
+                style={{ fontSize: 11, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
                 {deleting ? 'Deleting…' : 'Confirm'}
               </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                style={{ fontSize: 11, color: '#aaa', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}
-              >
+              <button onClick={() => setConfirmDelete(false)}
+                style={{ fontSize: 11, color: '#aaa', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}>
                 Cancel
               </button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => setConfirmDelete(true)}
-                style={{ fontSize: 11, color: '#f87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}
-              >
+              <button onClick={() => setConfirmDelete(true)}
+                style={{ fontSize: 11, color: '#f87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>
                 🗑 Delete
               </button>
-              <button
-                onClick={handleAddPage}
-                style={{ fontSize: 11, color: '#fde68a', background: 'rgba(180,120,60,0.35)', border: '1px solid rgba(180,120,60,0.4)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}
-              >
+              <button onClick={handleAddPage}
+                style={{ fontSize: 11, color: '#fde68a', background: 'rgba(180,120,60,0.35)', border: '1px solid rgba(180,120,60,0.4)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}>
                 + Add Page
               </button>
             </>
@@ -174,7 +165,6 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
             maxShadowOpacity={0.6}
             style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
           >
-            {/* Front cover */}
             <FlipPage style={{ background: '#7c3a1e', position: 'relative' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)', zIndex: 1 }} />
               {coverUrl ? (
@@ -184,17 +174,14 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
                   <div style={{ fontSize: 56, marginBottom: 24 }}>📖</div>
                   <h2 style={{ fontFamily: 'Playfair Display, serif', fontSize: 26, color: '#fde68a', marginBottom: 16 }}>{album.title}</h2>
                   <div style={{ width: 48, height: 2, background: 'rgba(253,230,138,0.3)', margin: '0 auto 28px' }} />
-                  <button
-                    onClick={openCoverPicker}
-                    style={{ fontSize: 13, color: '#fde68a', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(253,230,138,0.3)', borderRadius: 10, padding: '10px 20px', cursor: 'pointer', width: '100%' }}
-                  >
+                  <button onClick={openCoverPicker}
+                    style={{ fontSize: 13, color: '#fde68a', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(253,230,138,0.3)', borderRadius: 10, padding: '10px 20px', cursor: 'pointer', width: '100%' }}>
                     {uploadingCover ? 'Uploading…' : '+ Set Cover Photo'}
                   </button>
                 </div>
               )}
             </FlipPage>
 
-            {/* Content pages */}
             {pages.length === 0 ? (
               <FlipPage style={{ background: '#fffdf8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div style={{ textAlign: 'center', color: '#bbb' }}>
@@ -206,18 +193,11 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
             ) : (
               pages.map((page, i) => (
                 <FlipPage key={page.id} style={{ background: page.background || '#fffdf8', position: 'relative' }}>
-                  <BookPage
-                    page={page}
-                    pageNumber={i + 1}
-                    canvasW={PAGE_W}
-                    canvasH={PAGE_H}
-                    onEdit={() => setEditingPage(page)}
-                  />
+                  <BookPage page={page} pageNumber={i + 1} canvasW={PAGE_W} canvasH={PAGE_H} onEdit={() => setEditingPage(page)} />
                 </FlipPage>
               ))
             )}
 
-            {/* Back cover */}
             <FlipPage style={{ background: '#5c2d0e', position: 'relative' }}>
               <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)' }} />
             </FlipPage>
@@ -227,14 +207,10 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
 
       {/* Nav */}
       <div style={{ display: 'flex', justifyContent: 'center', gap: 20, padding: '12px 0 20px', flexShrink: 0 }}>
-        <button
-          onClick={() => bookRef.current?.pageFlip().flipPrev()}
-          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}
-        >◄ Prev</button>
-        <button
-          onClick={() => bookRef.current?.pageFlip().flipNext()}
-          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}
-        >Next ►</button>
+        <button onClick={() => bookRef.current?.pageFlip().flipPrev()}
+          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}>◄ Prev</button>
+        <button onClick={() => bookRef.current?.pageFlip().flipNext()}
+          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}>Next ►</button>
       </div>
     </div>
   )
