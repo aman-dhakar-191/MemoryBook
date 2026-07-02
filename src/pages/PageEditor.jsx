@@ -16,24 +16,9 @@ const tw = Math.floor((PAGE_W - G * 4) / 3)
 const th = Math.floor((CH - G * 4) / 3)
 
 const LAYOUTS = [
-  {
-    id: 'full', label: 'Full',
-    slots: [{ x: G, y: G, w: PAGE_W - G * 2, h: CH - G * 2 }],
-  },
-  {
-    id: 'side-by-side', label: 'Side by Side',
-    slots: [
-      { x: G, y: G, w: hw, h: CH - G * 2 },
-      { x: G * 2 + hw, y: G, w: hw, h: CH - G * 2 },
-    ],
-  },
-  {
-    id: 'top-bottom', label: 'Top & Bottom',
-    slots: [
-      { x: G, y: G, w: PAGE_W - G * 2, h: hh },
-      { x: G, y: G * 2 + hh, w: PAGE_W - G * 2, h: hh },
-    ],
-  },
+  { id: 'full', label: 'Full', slots: [{ x: G, y: G, w: PAGE_W - G * 2, h: CH - G * 2 }] },
+  { id: 'side-by-side', label: 'Side by Side', slots: [{ x: G, y: G, w: hw, h: CH - G * 2 }, { x: G * 2 + hw, y: G, w: hw, h: CH - G * 2 }] },
+  { id: 'top-bottom', label: 'Top & Bottom', slots: [{ x: G, y: G, w: PAGE_W - G * 2, h: hh }, { x: G, y: G * 2 + hh, w: PAGE_W - G * 2, h: hh }] },
   {
     id: 'featured-top', label: 'Featured Top',
     slots: [
@@ -50,31 +35,9 @@ const LAYOUTS = [
       { x: G * 2 + Math.floor((PAGE_W - G * 3) * 0.6), y: G * 2 + hh, w: Math.floor((PAGE_W - G * 3) * 0.4), h: hh },
     ],
   },
-  {
-    id: 'grid', label: 'Grid 2×2',
-    slots: [
-      { x: G, y: G, w: hw, h: hh },
-      { x: G * 2 + hw, y: G, w: hw, h: hh },
-      { x: G, y: G * 2 + hh, w: hw, h: hh },
-      { x: G * 2 + hw, y: G * 2 + hh, w: hw, h: hh },
-    ],
-  },
-  {
-    id: 'three-col', label: '3 Cols',
-    slots: [
-      { x: G, y: G, w: tw, h: CH - G * 2 },
-      { x: G * 2 + tw, y: G, w: tw, h: CH - G * 2 },
-      { x: G * 3 + tw * 2, y: G, w: tw, h: CH - G * 2 },
-    ],
-  },
-  {
-    id: 'three-row', label: '3 Rows',
-    slots: [
-      { x: G, y: G, w: PAGE_W - G * 2, h: th },
-      { x: G, y: G * 2 + th, w: PAGE_W - G * 2, h: th },
-      { x: G, y: G * 3 + th * 2, w: PAGE_W - G * 2, h: th },
-    ],
-  },
+  { id: 'grid', label: 'Grid 2×2', slots: [{ x: G, y: G, w: hw, h: hh }, { x: G * 2 + hw, y: G, w: hw, h: hh }, { x: G, y: G * 2 + hh, w: hw, h: hh }, { x: G * 2 + hw, y: G * 2 + hh, w: hw, h: hh }] },
+  { id: 'three-col', label: '3 Cols', slots: [{ x: G, y: G, w: tw, h: CH - G * 2 }, { x: G * 2 + tw, y: G, w: tw, h: CH - G * 2 }, { x: G * 3 + tw * 2, y: G, w: tw, h: CH - G * 2 }] },
+  { id: 'three-row', label: '3 Rows', slots: [{ x: G, y: G, w: PAGE_W - G * 2, h: th }, { x: G, y: G * 2 + th, w: PAGE_W - G * 2, h: th }, { x: G, y: G * 3 + th * 2, w: PAGE_W - G * 2, h: th }] },
 ]
 
 const BACKGROUNDS = [
@@ -90,14 +53,9 @@ const BACKGROUNDS = [
 const FRAMES = ['none', 'classic', 'polaroid', 'vintage', 'rounded', 'gold', 'shadow', 'thin', 'film', 'double']
 
 const FILTERS = [
-  { id: 'none',     label: 'Normal'   },
-  { id: 'bw',      label: 'B&W'      },
-  { id: 'sepia',   label: 'Sepia'    },
-  { id: 'warm',    label: 'Warm'     },
-  { id: 'cool',    label: 'Cool'     },
-  { id: 'faded',   label: 'Faded'    },
-  { id: 'vivid',   label: 'Vivid'    },
-  { id: 'dramatic',label: 'Dramatic' },
+  { id: 'none', label: 'Normal' }, { id: 'bw', label: 'B&W' }, { id: 'sepia', label: 'Sepia' },
+  { id: 'warm', label: 'Warm' }, { id: 'cool', label: 'Cool' }, { id: 'faded', label: 'Faded' },
+  { id: 'vivid', label: 'Vivid' }, { id: 'dramatic', label: 'Dramatic' },
 ]
 
 const FONTS = ['Inter', 'Playfair Display', 'Georgia', 'Courier New']
@@ -121,10 +79,10 @@ function getImageDimensions(url) {
 }
 
 function LayoutPreview({ slots }) {
-  const sx = 68 / PAGE_W, sy = 52 / PAGE_H
+  const sx = 60 / PAGE_W, sy = 46 / PAGE_H
   return (
-    <svg width={68} height={52} style={{ display: 'block' }}>
-      <rect width={68} height={52} fill="#242424" rx={3} />
+    <svg width={60} height={46} style={{ display: 'block' }}>
+      <rect width={60} height={46} fill="#242424" rx={3} />
       {slots.map((s, i) => (
         <rect key={i} x={s.x * sx} y={s.y * sy} width={s.w * sx} height={s.h * sy} fill="#5a5a5a" rx={1.5} />
       ))}
@@ -135,6 +93,8 @@ function LayoutPreview({ slots }) {
 function dismissKeyboard() {
   document.activeElement?.blur()
 }
+
+const divider = <div style={{ width: 1, height: 18, background: '#333', flexShrink: 0 }} />
 
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
@@ -151,16 +111,13 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   const selected = elements.find(e => e.id === selectedId)
 
-  function closePopovers() {
-    setShowLayouts(false)
-    setShowStickers(false)
-  }
+  function closeSheets() { setShowLayouts(false); setShowStickers(false) }
 
   function deselect() {
     dismissKeyboard()
     setSelectedId(null)
     setEditingId(null)
-    closePopovers()
+    closeSheets()
   }
 
   function updateEl(id, patch) {
@@ -185,13 +142,13 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   function applyLayout(layout) {
     const photos = elements.filter(e => e.type === 'photo')
-    const texts = elements.filter(e => e.type === 'text' || e.type === 'emoji')
+    const rest = elements.filter(e => e.type === 'text' || e.type === 'emoji')
     const newEls = layout.slots.map((s, i) =>
       i < photos.length
         ? { ...photos[i], x: s.x, y: s.y, width: s.w, height: s.h }
         : { id: uuid(), type: 'placeholder', x: s.x, y: s.y, width: s.w, height: s.h, rotation: 0 }
     )
-    setElements([...texts, ...newEls])
+    setElements([...rest, ...newEls])
     setSelectedId(null)
     setEditingId(null)
     setShowLayouts(false)
@@ -264,128 +221,142 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     } finally { setSaving(false) }
   }
 
-  const btn = (style = {}) => ({
-    border: 'none', borderRadius: 6, fontSize: 12, padding: '5px 10px', cursor: 'pointer', ...style,
-  })
+  const sel = (style = {}) => ({ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px', flexShrink: 0, ...style })
+  const btn = (style = {}) => ({ border: 'none', borderRadius: 6, fontSize: 12, padding: '5px 10px', cursor: 'pointer', flexShrink: 0, ...style })
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0f0f0f' }}>
       <input {...getInputProps()} />
       <input ref={placeholderInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePlaceholderFile} />
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexWrap: 'wrap', flexShrink: 0 }}>
-        <button onClick={onCancel} style={{ color: '#888', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', marginRight: 4 }}>← Back</button>
-        <div style={{ width: 1, height: 18, background: '#333' }} />
+      {/* ── Toolbar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
 
-        <button onClick={open} disabled={uploading} style={btn({ background: '#1d4ed8', color: 'white', opacity: uploading ? 0.6 : 1 })}>
-          {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}…` : '+ Photos'}
+        {/* Back — always visible */}
+        <button onClick={onCancel} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>
+          ← Back
         </button>
-        <button onClick={addText} style={btn({ background: '#7c3aed', color: 'white' })}>+ Text</button>
+        <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
 
-        {/* Sticker picker */}
-        <div style={{ position: 'relative' }}>
+        {/* Scrollable middle strip */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, overflowX: 'auto', padding: '0 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+
+          <button onClick={open} disabled={uploading} style={btn({ background: '#1d4ed8', color: 'white', opacity: uploading ? 0.6 : 1 })}>
+            {uploading ? `↑${uploadCount.done}/${uploadCount.total}` : '+ Photos'}
+          </button>
+
+          <button onClick={addText} style={btn({ background: '#7c3aed', color: 'white' })}>+ Text</button>
+
           <button onClick={() => { setShowStickers(v => !v); setShowLayouts(false) }} style={btn({ background: '#b45309', color: 'white' })}>😊 Sticker</button>
-          {showStickers && (
-            <div
-              style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', width: 252 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, maxHeight: 220, overflowY: 'auto' }}>
-                {STICKERS.map((emoji, i) => (
-                  <button key={i} onClick={() => addEmoji(emoji)}
-                    style={{ background: 'none', border: 'none', fontSize: 26, cursor: 'pointer', padding: '4px 2px', borderRadius: 6, lineHeight: 1 }}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Layout picker */}
-        <div style={{ position: 'relative' }}>
           <button onClick={() => { setShowLayouts(v => !v); setShowStickers(false) }} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
-          {showLayouts && (
-            <div
-              style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: '#1a1a1a', border: '1px solid #333', borderRadius: 10, padding: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.6)', width: 340 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <p style={{ color: '#555', fontSize: 10, marginBottom: 8 }}>Existing photos are rearranged; empty slots become placeholders.</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {LAYOUTS.map(l => (
-                  <button key={l.id} onClick={() => applyLayout(l)}
-                    style={{ background: 'none', border: '1px solid #333', borderRadius: 6, padding: 6, cursor: 'pointer', textAlign: 'center' }}
-                  >
-                    <LayoutPreview slots={l.slots} />
-                    <div style={{ color: '#aaa', fontSize: 9, marginTop: 4, lineHeight: 1.2 }}>{l.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* BG */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ color: '#555', fontSize: 11 }}>BG</span>
+          {divider}
+
+          {/* BG colors */}
+          <span style={{ color: '#666', fontSize: 11, flexShrink: 0 }}>BG</span>
           {BACKGROUNDS.map(bg => (
             <button key={bg.color} title={bg.label} onClick={() => setBackground(bg.color)}
-              style={{ width: 17, height: 17, borderRadius: '50%', background: bg.color, border: background === bg.color ? '2px solid white' : '2px solid #444', transform: background === bg.color ? 'scale(1.3)' : 'scale(1)', transition: 'all .15s', cursor: 'pointer' }}
+              style={{ width: 18, height: 18, borderRadius: '50%', background: bg.color, border: background === bg.color ? '2px solid white' : '2px solid #444', transform: background === bg.color ? 'scale(1.25)' : 'scale(1)', transition: 'all .15s', cursor: 'pointer', flexShrink: 0 }}
             />
           ))}
+
+          {/* Selected element controls */}
+          {selected && (
+            <>
+              {divider}
+              {selected.type === 'photo' && (
+                <>
+                  <select value={selected.frame || 'none'} onChange={e => updateEl(selected.id, { frame: e.target.value })} style={sel()}>
+                    {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                  <select value={selected.filter || 'none'} onChange={e => updateEl(selected.id, { filter: e.target.value })} style={sel()}>
+                    {FILTERS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                  </select>
+                </>
+              )}
+              {selected.type === 'text' && (
+                <>
+                  <select value={selected.fontFamily} onChange={e => updateEl(selected.id, { fontFamily: e.target.value })} style={sel({ maxWidth: 110 })}>
+                    {FONTS.map(f => <option key={f}>{f}</option>)}
+                  </select>
+                  <input type="number" value={selected.fontSize} min={10} max={96} onChange={e => updateEl(selected.id, { fontSize: +e.target.value })} style={sel({ width: 46 })} />
+                  <input type="color" value={selected.color} onChange={e => updateEl(selected.id, { color: e.target.value })} style={{ width: 26, height: 26, border: 'none', cursor: 'pointer', borderRadius: 4, flexShrink: 0 }} />
+                </>
+              )}
+              <span style={{ color: '#555', fontSize: 11, flexShrink: 0 }}>°</span>
+              <input type="number" value={selected.rotation || 0} min={-180} max={180} onChange={e => updateEl(selected.id, { rotation: +e.target.value })} style={sel({ width: 46 })} />
+              <button onClick={() => move(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}>↓</button>
+              <button onClick={() => move(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}>↑</button>
+              <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px', flexShrink: 0 }}>✕</button>
+            </>
+          )}
         </div>
 
-        {/* Selected element controls */}
-        {selected && (
-          <>
-            <div style={{ width: 1, height: 18, background: '#333' }} />
-            {selected.type === 'photo' && (
-              <>
-                <select value={selected.frame || 'none'} onChange={e => updateEl(selected.id, { frame: e.target.value })}
-                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
-                  {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-                <select value={selected.filter || 'none'} onChange={e => updateEl(selected.id, { filter: e.target.value })}
-                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
-                  {FILTERS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                </select>
-              </>
-            )}
-            {selected.type === 'text' && (
-              <>
-                <select value={selected.fontFamily} onChange={e => updateEl(selected.id, { fontFamily: e.target.value })}
-                  style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }}>
-                  {FONTS.map(f => <option key={f}>{f}</option>)}
-                </select>
-                <input type="number" value={selected.fontSize} min={10} max={96} onChange={e => updateEl(selected.id, { fontSize: +e.target.value })}
-                  style={{ width: 46, background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }} />
-                <input type="color" value={selected.color} onChange={e => updateEl(selected.id, { color: e.target.value })}
-                  style={{ width: 26, height: 26, border: 'none', cursor: 'pointer', borderRadius: 4 }} />
-              </>
-            )}
-            <span style={{ color: '#555', fontSize: 11 }}>°</span>
-            <input type="number" value={selected.rotation || 0} min={-180} max={180} onChange={e => updateEl(selected.id, { rotation: +e.target.value })}
-              style={{ width: 46, background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px' }} />
-            <button onClick={() => move(-1)} style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>↓</button>
-            <button onClick={() => move(1)} style={{ color: '#666', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14 }}>↑</button>
-            <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 13 }}>✕</button>
-          </>
-        )}
-
+        {/* Save — always visible */}
+        <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
         <button onClick={handleSave} disabled={saving}
-          style={btn({ background: '#16a34a', color: 'white', fontSize: 13, padding: '5px 16px', fontWeight: 600, marginLeft: 'auto', opacity: saving ? 0.5 : 1 })}>
-          {saving ? 'Saving…' : 'Save'}
+          style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: 0, fontSize: 13, fontWeight: 700, padding: '0 14px', cursor: 'pointer', height: 44, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>
+          {saving ? '✓…' : 'Save'}
         </button>
       </div>
 
-      {/* Canvas scroll area — tapping the dark gutter deselects */}
+      {/* ── Bottom sheet backdrop ── */}
+      {(showLayouts || showStickers) && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)' }}
+          onClick={closeSheets}
+        />
+      )}
+
+      {/* ── Layout bottom sheet ── */}
+      {showLayouts && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: '#1c1c1c', borderRadius: '16px 16px 0 0',
+          padding: '12px 16px 32px',
+        }}>
+          <div style={{ width: 36, height: 4, background: '#444', borderRadius: 2, margin: '0 auto 14px' }} />
+          <p style={{ color: '#555', fontSize: 11, marginBottom: 12, textAlign: 'center' }}>Photos are rearranged — empty slots become placeholders</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {LAYOUTS.map(l => (
+              <button key={l.id} onClick={() => applyLayout(l)}
+                style={{ background: 'none', border: '1px solid #333', borderRadius: 8, padding: 8, cursor: 'pointer', textAlign: 'center' }}
+              >
+                <LayoutPreview slots={l.slots} />
+                <div style={{ color: '#aaa', fontSize: 10, marginTop: 5, lineHeight: 1.2 }}>{l.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sticker bottom sheet ── */}
+      {showStickers && (
+        <div style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+          background: '#1c1c1c', borderRadius: '16px 16px 0 0',
+          padding: '12px 12px 32px',
+          maxHeight: '52vh', overflowY: 'auto',
+        }}>
+          <div style={{ width: 36, height: 4, background: '#444', borderRadius: 2, margin: '0 auto 12px' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 4 }}>
+            {STICKERS.map((emoji, i) => (
+              <button key={i} onClick={() => addEmoji(emoji)}
+                style={{ background: 'none', border: 'none', fontSize: 28, cursor: 'pointer', padding: '5px 0', borderRadius: 6, lineHeight: 1 }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Canvas ── */}
       <div
         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }}
         onClick={deselect}
       >
-        {/* Page canvas — tapping empty page area also deselects/blurs */}
         <div
           style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
           onClick={e => { e.stopPropagation(); deselect() }}
@@ -407,7 +378,6 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   placeholderTarget.current = el.id
                   placeholderInputRef.current?.click()
                 } else if (el.type === 'text') {
-                  // Single tap: select + immediately enter edit mode
                   setSelectedId(el.id)
                   setEditingId(el.id)
                 } else {
@@ -430,12 +400,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   </div>
                 )}
                 {el.type === 'emoji' && (
-                  <div style={{
-                    width: '100%', height: '100%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: Math.min(el.width, el.height) * 0.8,
-                    lineHeight: 1, userSelect: 'none', cursor: 'default',
-                  }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.min(el.width, el.height) * 0.8, lineHeight: 1, userSelect: 'none' }}>
                     {el.content}
                   </div>
                 )}
@@ -448,22 +413,11 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                       onBlur={() => setEditingId(prev => prev === el.id ? null : prev)}
                       onClick={e => e.stopPropagation()}
                       placeholder="Type here…"
-                      style={{
-                        width: '100%', height: '100%',
-                        fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
-                        background: 'transparent', border: 'none', outline: 'none',
-                        resize: 'none', cursor: 'text', lineHeight: 1.6, padding: 0,
-                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                      }}
+                      style={{ width: '100%', height: '100%', fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, background: 'transparent', border: 'none', outline: 'none', resize: 'none', cursor: 'text', lineHeight: 1.6, padding: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
                     />
                   ) : (
-                    <div style={{
-                      fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
-                      width: '100%', height: '100%', overflow: 'hidden',
-                      whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6,
-                      userSelect: 'none', cursor: 'text',
-                    }}>
-                      {el.content || <span style={{ color: '#888', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
+                    <div style={{ fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, width: '100%', height: '100%', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6, userSelect: 'none', cursor: 'text' }}>
+                      {el.content || <span style={{ color: '#aaa', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
                     </div>
                   )
                 )}
