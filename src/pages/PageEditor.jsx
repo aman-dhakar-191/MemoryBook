@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { flushSync } from 'react-dom'
 import { Rnd } from 'react-rnd'
 import { useDropzone } from 'react-dropzone'
 import { v4 as uuid } from 'uuid'
@@ -91,6 +92,18 @@ function dismissKeyboard() { document.activeElement?.blur() }
 
 const divider = <div style={{ width: 1, height: 18, background: '#333', flexShrink: 0 }} />
 
+// Larger touch targets for resize handles
+const RESIZE_HANDLES = {
+  bottomRight: { width: 24, height: 24, right: -6, bottom: -6, zIndex: 10 },
+  bottomLeft:  { width: 24, height: 24, left:  -6, bottom: -6, zIndex: 10 },
+  topRight:    { width: 24, height: 24, right: -6, top:    -6, zIndex: 10 },
+  topLeft:     { width: 24, height: 24, left:  -6, top:    -6, zIndex: 10 },
+  bottom: { height: 18, bottom: -5, left: '20%', width: '60%' },
+  top:    { height: 18, top:    -5, left: '20%', width: '60%' },
+  left:   { width:  18, left:   -5, top:  '20%', height: '60%' },
+  right:  { width:  18, right:  -5, top:  '20%', height: '60%' },
+}
+
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
   const [background, setBackground] = useState(page.background || '#fffdf8')
@@ -103,6 +116,8 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [showStickers, setShowStickers] = useState(false)
   const placeholderInputRef = useRef(null)
   const placeholderTarget = useRef(null)
+  // Refs to all mounted textareas so we can focus synchronously (required for iOS keyboard)
+  const textareaRefs = useRef({})
 
   const selected = elements.find(e => e.id === selectedId)
 
@@ -126,6 +141,13 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       ;[next[i], next[t]] = [next[t], next[i]]
       return next
     })
+  }
+
+  // Enter text-edit mode: select + show textarea + focus (iOS-safe: sync focus within click handler)
+  function enterTextEdit(id) {
+    setSelectedId(id)
+    setEditingId(id)
+    textareaRefs.current[id]?.focus()
   }
 
   function applyLayout(layout) {
@@ -177,9 +199,15 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const { getInputProps, open } = useDropzone({ onDrop, accept: { 'image/*': [] }, noClick: true, maxSize: 20 * 1024 * 1024 })
 
   function addText() {
-    const el = { id: uuid(), type: 'text', content: '', fontSize: 18, color: '#333', fontFamily: 'Inter', x: 60, y: 60, width: 240, height: 80, rotation: 0 }
-    setElements(prev => [...prev, el])
-    setSelectedId(el.id); setEditingId(el.id)
+    const id = uuid()
+    const el = { id, type: 'text', content: '', fontSize: 18, color: '#333', fontFamily: 'Inter', x: 60, y: 60, width: 240, height: 80, rotation: 0 }
+    // flushSync forces React to render synchronously so the textarea ref is available before focus()
+    flushSync(() => {
+      setElements(prev => [...prev, el])
+      setSelectedId(id)
+      setEditingId(id)
+    })
+    textareaRefs.current[id]?.focus()
   }
 
   function addEmoji(emoji) {
@@ -204,8 +232,8 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       <input {...getInputProps()} />
       <input ref={placeholderInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePlaceholderFile} />
 
-      {/* ── Toolbar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
+      {/* ── Toolbar — data-toolbar lets onBlur detect if focus moved here ── */}
+      <div data-toolbar style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
         <button onClick={onCancel} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>← Back</button>
         <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
 
@@ -310,7 +338,15 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               lockAspectRatio={el.type === 'photo'}
               disableDragging={el.type === 'placeholder' || editingId === el.id}
               enableResizing={el.type !== 'placeholder' && editingId !== el.id}
-              style={{ zIndex: index + 1, outline: selectedId === el.id ? '2px solid #60a5fa' : 'none', outlineOffset: 2 }}
+              resizeHandleStyles={RESIZE_HANDLES}
+              style={{
+                zIndex: index + 1,
+                outline: selectedId === el.id ? '2px solid #60a5fa' : 'none',
+                outlineOffset: 2,
+                // Rotation on the Rnd wrapper — handles and outline rotate with content
+                transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
+                transformOrigin: 'center center',
+              }}
               onDragStop={(_, d) => updateEl(el.id, { x: d.x, y: d.y })}
               onResizeStop={(_, __, ref, ___, pos) => updateEl(el.id, { width: ref.offsetWidth, height: ref.offsetHeight, x: pos.x, y: pos.y })}
               onClick={e => {
@@ -319,13 +355,14 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   placeholderTarget.current = el.id
                   placeholderInputRef.current?.click()
                 } else if (el.type === 'text') {
-                  setSelectedId(el.id); setEditingId(el.id)
+                  enterTextEdit(el.id)
                 } else {
                   setSelectedId(el.id); setEditingId(null)
                 }
               }}
             >
-              <div style={{ width: '100%', height: '100%', transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined }}>
+              {/* No rotation here — moved to Rnd style above */}
+              <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                 {el.type === 'photo' && (
                   <img src={el.imageUrl} alt="" className={`frame-${el.frame || 'none'} filter-${el.filter || 'none'}`} draggable={false}
                     style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
@@ -337,23 +374,61 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   </div>
                 )}
                 {el.type === 'emoji' && (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.min(el.width, el.height) * 0.8, lineHeight: 1, userSelect: 'none' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.min(el.width, el.height) * 0.8, lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
                     {el.content}
                   </div>
                 )}
                 {el.type === 'text' && (
-                  editingId === el.id ? (
-                    <textarea autoFocus value={el.content}
+                  <>
+                    {/*
+                     * Textarea is ALWAYS mounted (never conditionally rendered).
+                     * Toggling opacity + pointerEvents lets us call .focus() synchronously
+                     * inside the click handler — which is required on iOS for the keyboard
+                     * to appear. autoFocus on a newly-mounted element is too late on iOS.
+                     */}
+                    <textarea
+                      ref={ref => {
+                        if (ref) textareaRefs.current[el.id] = ref
+                        else delete textareaRefs.current[el.id]
+                      }}
+                      value={el.content}
                       onChange={e => updateEl(el.id, { content: e.target.value })}
-                      onBlur={() => setEditingId(prev => prev === el.id ? null : prev)}
+                      onBlur={() => {
+                        // Delay so the newly-focused element can register.
+                        // If focus moved into the toolbar, stay in edit mode so the
+                        // user can change font/size/color without losing the textarea.
+                        setTimeout(() => {
+                          const toolbar = document.querySelector('[data-toolbar]')
+                          if (toolbar?.contains(document.activeElement)) return
+                          setEditingId(prev => prev === el.id ? null : prev)
+                        }, 100)
+                      }}
                       onClick={e => e.stopPropagation()}
                       placeholder="Type here…"
-                      style={{ width: '100%', height: '100%', fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, background: 'transparent', border: 'none', outline: 'none', resize: 'none', cursor: 'text', lineHeight: 1.6, padding: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} />
-                  ) : (
-                    <div style={{ fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, width: '100%', height: '100%', overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6, userSelect: 'none', cursor: 'text' }}>
+                      style={{
+                        position: 'absolute', inset: 0,
+                        width: '100%', height: '100%',
+                        fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
+                        background: 'transparent', border: 'none', outline: 'none',
+                        resize: 'none', lineHeight: 1.6, padding: 0,
+                        whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                        // Hidden when not editing; pointer-events off so Rnd clicks pass through
+                        opacity: editingId === el.id ? 1 : 0,
+                        pointerEvents: editingId === el.id ? 'auto' : 'none',
+                        cursor: 'text', zIndex: 2,
+                      }}
+                    />
+                    {/* Display layer — always visible, no pointer events (click passes to Rnd) */}
+                    <div style={{
+                      position: 'absolute', inset: 0,
+                      fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
+                      overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                      lineHeight: 1.6, userSelect: 'none', cursor: 'text',
+                      pointerEvents: 'none', zIndex: 1,
+                    }}>
                       {el.content || <span style={{ color: '#aaa', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
                     </div>
-                  )
+                  </>
                 )}
               </div>
             </Rnd>
