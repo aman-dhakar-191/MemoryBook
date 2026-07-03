@@ -1,5 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
-import { Rnd } from 'react-rnd'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { v4 as uuid } from 'uuid'
 import { updatePage } from '../firebase/firestore'
@@ -89,47 +88,39 @@ function LayoutPreview({ slots }) {
 
 const divider = <div style={{ width: 1, height: 18, background: '#333', flexShrink: 0 }} />
 
-// Larger touch targets for resize handles
-const RESIZE_HANDLES = {
-  bottomRight: { width: 24, height: 24, right: -6, bottom: -6, zIndex: 10 },
-  bottomLeft:  { width: 24, height: 24, left:  -6, bottom: -6, zIndex: 10 },
-  topRight:    { width: 24, height: 24, right: -6, top:    -6, zIndex: 10 },
-  topLeft:     { width: 24, height: 24, left:  -6, top:    -6, zIndex: 10 },
-  bottom: { height: 18, bottom: -5, left: '20%', width: '60%' },
-  top:    { height: 18, top:    -5, left: '20%', width: '60%' },
-  left:   { width:  18, left:   -5, top:  '20%', height: '60%' },
-  right:  { width:  18, right:  -5, top:  '20%', height: '60%' },
-}
-
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])
   const [background, setBackground] = useState(page.background || '#fffdf8')
   const [selectedId, setSelectedId] = useState(null)
-  // textOverlayId: which text element is being edited in the bottom-sheet overlay.
-  // Keeping the textarea *outside* react-rnd avoids all iOS keyboard / focus conflicts.
   const [textOverlayId, setTextOverlayId] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 })
   const [saving, setSaving] = useState(false)
   const [showLayouts, setShowLayouts] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
+  const [scale, setScale] = useState(1)
+
+  const canvasRef = useRef(null)
   const placeholderInputRef = useRef(null)
   const placeholderTarget = useRef(null)
-  const canvasRef = useRef(null)
-  // Stores { id, cx, cy } while a rotation drag is active
-  const rotState = useRef(null)
+
+  // All currently active pointers: { pointerId, elId, startCX, startCY, curCX, curCY, startElX, startElY, startTime }
+  const ptrs = useRef([])
+  // Current gesture: { type:'drag'|'pinch'|'rot-handle'|'resize-handle', elId, ... }
+  const gesture = useRef(null)
+
+  useEffect(() => {
+    const update = () => setScale(Math.min(1, (window.innerWidth - 8) / PAGE_W))
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   const selected = elements.find(e => e.id === selectedId)
   const textOverlayEl = elements.find(e => e.id === textOverlayId)
 
   function closeSheets() { setShowLayouts(false); setShowStickers(false) }
-
-  function deselect() {
-    document.activeElement?.blur()
-    setSelectedId(null)
-    setTextOverlayId(null)
-    closeSheets()
-  }
+  function deselect() { setSelectedId(null); setTextOverlayId(null); closeSheets() }
 
   function updateEl(id, patch) {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
@@ -221,41 +212,184 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     } finally { setSaving(false) }
   }
 
-  // ── Rotation drag via pointer capture ──────────────────────────────────────
-  function onRotatePointerDown(el, e) {
+  // ── Gesture system (replaces react-rnd) ───────────────────────────────────
+  // Uses Pointer Events API which handles both mouse and touch uniformly.
+  // Two pointers on same element → pinch to resize + twist to rotate.
+  // Single pointer → tap to select / drag to move.
+
+  function elPointerDown(el, e) {
     e.stopPropagation()
-    e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
-    const canvasRect = canvasRef.current.getBoundingClientRect()
-    rotState.current = {
-      id: el.id,
-      cx: canvasRect.left + el.x + el.width / 2,
-      cy: canvasRect.top + el.y + el.height / 2,
+
+    ptrs.current.push({
+      pointerId: e.pointerId, elId: el.id,
+      startCX: e.clientX, startCY: e.clientY,
+      curCX: e.clientX, curCY: e.clientY,
+      startElX: el.x, startElY: el.y,
+      startTime: Date.now(),
+    })
+
+    const ep = ptrs.current.filter(p => p.elId === el.id)
+
+    if (ep.length >= 2) {
+      // Two fingers → switch to pinch/rotate
+      const p1 = ep[ep.length - 2], p2 = ep[ep.length - 1]
+      gesture.current = {
+        type: 'pinch', elId: el.id,
+        startDist: Math.hypot(p2.startCX - p1.startCX, p2.startCY - p1.startCY),
+        startAngle: Math.atan2(p2.startCY - p1.startCY, p2.startCX - p1.startCX) * 180 / Math.PI,
+        startW: el.width, startH: el.height, startRot: el.rotation || 0,
+        keepAspect: el.type === 'photo',
+      }
+      // Select on two-finger gesture
+      setSelectedId(el.id)
+    } else {
+      gesture.current = {
+        type: 'drag', elId: el.id, pointerId: e.pointerId,
+        moved: false,
+      }
     }
   }
-  function onRotatePointerMove(e) {
-    if (!rotState.current) return
-    const { id, cx, cy } = rotState.current
-    const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI + 90
-    updateEl(id, { rotation: Math.round(angle) })
+
+  function elPointerMove(el, e) {
+    const ptr = ptrs.current.find(p => p.pointerId === e.pointerId)
+    if (ptr) { ptr.curCX = e.clientX; ptr.curCY = e.clientY }
+
+    const g = gesture.current
+    if (!g || g.elId !== el.id) return
+
+    if (g.type === 'drag' && g.pointerId === e.pointerId) {
+      const p = ptrs.current.find(p => p.pointerId === e.pointerId)
+      if (!p) return
+      const dx = (e.clientX - p.startCX) / scale
+      const dy = (e.clientY - p.startCY) / scale
+      if (!g.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) g.moved = true
+      if (g.moved) {
+        updateEl(el.id, {
+          x: Math.max(-el.width + 20, Math.min(PAGE_W - 20, p.startElX + dx)),
+          y: Math.max(-el.height + 20, Math.min(PAGE_H - 20, p.startElY + dy)),
+        })
+      }
+    } else if (g.type === 'pinch') {
+      const ep = ptrs.current.filter(p => p.elId === el.id)
+      if (ep.length < 2) return
+      const p1 = ep[ep.length - 2], p2 = ep[ep.length - 1]
+      const dist = Math.hypot(p2.curCX - p1.curCX, p2.curCY - p1.curCY)
+      const angle = Math.atan2(p2.curCY - p1.curCY, p2.curCX - p1.curCX) * 180 / Math.PI
+      const sf = g.startDist > 0 ? dist / g.startDist : 1
+      const dAngle = angle - g.startAngle
+      const newW = Math.max(40, Math.round(g.startW * sf))
+      const newH = g.keepAspect
+        ? Math.round(newW * g.startH / g.startW)
+        : Math.max(40, Math.round(g.startH * sf))
+      updateEl(el.id, { width: newW, height: newH, rotation: Math.round(g.startRot + dAngle) })
+    }
   }
-  function onRotatePointerUp(e) {
-    rotState.current = null
-    e.currentTarget.releasePointerCapture(e.pointerId)
+
+  function elPointerUp(el, e) {
+    const ptr = ptrs.current.find(p => p.pointerId === e.pointerId)
+    const g = gesture.current
+
+    // Tap: no movement, quick
+    if (ptr && g?.type === 'drag' && !g.moved && Date.now() - ptr.startTime < 400) {
+      if (el.type === 'placeholder') {
+        placeholderTarget.current = el.id
+        placeholderInputRef.current?.click()
+      } else if (el.type === 'text') {
+        setSelectedId(el.id)
+        setTextOverlayId(el.id)
+      } else {
+        setSelectedId(el.id)
+      }
+    }
+
+    ptrs.current = ptrs.current.filter(p => p.pointerId !== e.pointerId)
+    const remaining = ptrs.current.filter(p => p.elId === el.id)
+
+    if (remaining.length === 0) {
+      gesture.current = null
+    } else if (remaining.length === 1 && g?.type === 'pinch') {
+      // Back to single-finger after pinch
+      const p = remaining[0]
+      gesture.current = {
+        type: 'drag', elId: el.id, pointerId: p.pointerId,
+        moved: false,
+      }
+    }
   }
-  // ──────────────────────────────────────────────────────────────────────────
+
+  function elPointerCancel(el, e) {
+    ptrs.current = ptrs.current.filter(p => p.pointerId !== e.pointerId)
+    if (!ptrs.current.some(p => p.elId === el.id)) gesture.current = null
+  }
+
+  // ── Rotation handle ────────────────────────────────────────────────────────
+  const rotG = useRef(null)
+
+  function rotDown(el, e) {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const rect = canvasRef.current.getBoundingClientRect()
+    rotG.current = {
+      pointerId: e.pointerId, elId: el.id,
+      cx: rect.left + (el.x + el.width / 2) * scale,
+      cy: rect.top + (el.y + el.height / 2) * scale,
+    }
+  }
+  function rotMove(e) {
+    const r = rotG.current
+    if (!r || r.pointerId !== e.pointerId) return
+    const angle = Math.atan2(e.clientY - r.cy, e.clientX - r.cx) * 180 / Math.PI + 90
+    updateEl(r.elId, { rotation: Math.round(angle) })
+  }
+  function rotUp(e) {
+    rotG.current = null
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+  }
+
+  // ── Desktop corner resize handles ─────────────────────────────────────────
+  const resG = useRef(null)
+
+  function resDown(el, corner, e) {
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    resG.current = {
+      pointerId: e.pointerId, elId: el.id, corner,
+      startCX: e.clientX, startCY: e.clientY,
+      startX: el.x, startY: el.y, startW: el.width, startH: el.height,
+      keepAspect: el.type === 'photo' ? el.width / el.height : null,
+    }
+  }
+  function resMove(e) {
+    const r = resG.current
+    if (!r || r.pointerId !== e.pointerId) return
+    const dx = (e.clientX - r.startCX) / scale
+    const dy = (e.clientY - r.startCY) / scale
+    let x = r.startX, y = r.startY, w = r.startW, h = r.startH
+    if (r.corner.includes('e')) w = Math.max(40, r.startW + dx)
+    if (r.corner.includes('w')) { w = Math.max(40, r.startW - dx); x = r.startX + r.startW - w }
+    if (r.corner.includes('s')) h = Math.max(40, r.startH + dy)
+    if (r.corner.includes('n')) { h = Math.max(40, r.startH - dy); y = r.startY + r.startH - h }
+    if (r.keepAspect) h = w / r.keepAspect
+    updateEl(r.elId, { x, y, width: Math.round(w), height: Math.round(h) })
+  }
+  function resUp(e) {
+    resG.current = null
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+  }
+
+  // ── Rotation handle position (in canvas coords) ────────────────────────────
+  function rotPos(el) {
+    const rot = (el.rotation || 0) * Math.PI / 180
+    const dist = Math.max(el.width, el.height) / 2 + 32
+    return {
+      x: el.x + el.width / 2 + dist * Math.sin(rot) - 14,
+      y: el.y + el.height / 2 - dist * Math.cos(rot) - 14,
+    }
+  }
 
   const sel = (s = {}) => ({ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px', flexShrink: 0, ...s })
   const btn = (s = {}) => ({ border: 'none', borderRadius: 6, fontSize: 12, padding: '5px 10px', cursor: 'pointer', flexShrink: 0, ...s })
-
-  // Rotation handle position in canvas coords (handle floats above element center)
-  function rotHandlePos(el) {
-    const rot = (el.rotation || 0) * Math.PI / 180
-    const dist = Math.max(el.width, el.height) / 2 + 30
-    const cx = el.x + el.width / 2
-    const cy = el.y + el.height / 2
-    return { x: cx + dist * Math.sin(rot) - 14, y: cy - dist * Math.cos(rot) - 14 }
-  }
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#0f0f0f' }}>
@@ -266,7 +400,6 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       <div data-toolbar style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
         <button onClick={onCancel} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>← Back</button>
         <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
-
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, overflowX: 'auto', padding: '0 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <button onClick={open} disabled={uploading} style={btn({ background: '#1d4ed8', color: 'white', opacity: uploading ? 0.6 : 1 })}>
             {uploading ? `↑${uploadCount.done}/${uploadCount.total}` : '+ Photos'}
@@ -304,16 +437,12 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                 </>
               )}
               {divider}
-              <span style={{ color: '#555', fontSize: 11, flexShrink: 0 }}>°</span>
-              <input type="number" value={selected.rotation || 0} min={-180} max={180}
-                onChange={e => updateEl(selected.id, { rotation: +e.target.value })} style={sel({ width: 46 })} />
-              <button onClick={() => move(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}>↓</button>
-              <button onClick={() => move(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }}>↑</button>
+              <button onClick={() => move(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }} title="Send backward">↓</button>
+              <button onClick={() => move(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }} title="Bring forward">↑</button>
               <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px', flexShrink: 0 }}>✕</button>
             </>
           )}
         </div>
-
         <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
         <button onClick={handleSave} disabled={saving}
           style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: 0, fontSize: 13, fontWeight: 700, padding: '0 14px', cursor: 'pointer', height: 44, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>
@@ -321,7 +450,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         </button>
       </div>
 
-      {/* ── Backdrop (sheets) ── */}
+      {/* ── Backdrop ── */}
       {(showLayouts || showStickers) && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)' }} onClick={closeSheets} />
       )}
@@ -330,7 +459,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       {showLayouts && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, background: '#1c1c1c', borderRadius: '16px 16px 0 0', padding: '12px 16px 32px' }}>
           <div style={{ width: 36, height: 4, background: '#444', borderRadius: 2, margin: '0 auto 14px' }} />
-          <p style={{ color: '#555', fontSize: 11, marginBottom: 12, textAlign: 'center' }}>Photos are rearranged — empty slots become placeholders</p>
+          <p style={{ color: '#555', fontSize: 11, marginBottom: 12, textAlign: 'center' }}>Photos rearranged — empty slots become placeholders</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {LAYOUTS.map(l => (
               <button key={l.id} onClick={() => applyLayout(l)}
@@ -358,26 +487,16 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
         </div>
       )}
 
-      {/*
-       * ── Text editing overlay ──────────────────────────────────────────────
-       * The textarea lives HERE, outside react-rnd, so iOS keyboard always
-       * appears reliably (no touch-event conflicts from the drag library).
-       * Tapping the text element opens this overlay; Done / backdrop closes it.
-       */}
+      {/* ── Text editing overlay ── */}
       {textOverlayEl && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-          onClick={() => setTextOverlayId(null)}
-        >
-          <div
-            style={{ background: '#1c1c1c', borderRadius: '16px 16px 0 0', padding: '14px 16px max(28px, env(safe-area-inset-bottom))' }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* style controls inside overlay so font/size/color are accessible while typing */}
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+          onClick={() => setTextOverlayId(null)}>
+          <div style={{ background: '#1c1c1c', borderRadius: '16px 16px 0 0', padding: '14px 16px max(28px, env(safe-area-inset-bottom))' }}
+            onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ color: '#777', fontSize: 12, flexShrink: 0 }}>Text style</span>
+              <span style={{ color: '#777', fontSize: 12, flexShrink: 0 }}>Style</span>
               <select value={textOverlayEl.fontFamily} onChange={e => updateEl(textOverlayEl.id, { fontFamily: e.target.value })}
-                style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px', flex: 1, maxWidth: 120 }}>
+                style={{ background: '#252525', color: 'white', border: '1px solid #333', borderRadius: 6, fontSize: 11, padding: '3px 5px', flex: 1, maxWidth: 130 }}>
                 {FONTS.map(f => <option key={f}>{f}</option>)}
               </select>
               <input type="number" value={textOverlayEl.fontSize} min={10} max={96}
@@ -386,8 +505,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               <input type="color" value={textOverlayEl.color}
                 onChange={e => updateEl(textOverlayEl.id, { color: e.target.value })}
                 style={{ width: 26, height: 26, border: 'none', cursor: 'pointer', borderRadius: 4, flexShrink: 0 }} />
-              <button
-                onClick={() => setTextOverlayId(null)}
+              <button onClick={() => setTextOverlayId(null)}
                 style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 700, padding: '5px 14px', cursor: 'pointer', flexShrink: 0 }}>
                 Done
               </button>
@@ -399,18 +517,12 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               placeholder="Type here…"
               rows={5}
               style={{
-                width: '100%',
-                background: '#252525',
-                color: textOverlayEl.color,
-                fontFamily: textOverlayEl.fontFamily,
-                fontSize: Math.max(textOverlayEl.fontSize, 16), // ≥16px prevents iOS auto-zoom
-                border: '1px solid #3a3a3a',
-                borderRadius: 8,
-                padding: '10px 12px',
-                resize: 'none',
-                outline: 'none',
-                lineHeight: 1.6,
-                boxSizing: 'border-box',
+                width: '100%', background: '#252525',
+                color: textOverlayEl.color, fontFamily: textOverlayEl.fontFamily,
+                fontSize: Math.max(textOverlayEl.fontSize, 16),
+                border: '1px solid #3a3a3a', borderRadius: 8,
+                padding: '10px 12px', resize: 'none', outline: 'none',
+                lineHeight: 1.6, boxSizing: 'border-box',
               }}
             />
           </div>
@@ -418,106 +530,124 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       )}
 
       {/* ── Canvas ── */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto' }} onClick={deselect}>
-        <div
-          ref={canvasRef}
-          style={{ position: 'relative', width: PAGE_W, height: PAGE_H, background, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', flexShrink: 0 }}
-          onClick={e => { e.stopPropagation(); deselect() }}
-        >
-          {elements.map((el, index) => (
-            <Rnd key={el.id}
-              position={{ x: el.x, y: el.y }}
-              size={{ width: el.width, height: el.height }}
-              bounds="parent"
-              lockAspectRatio={el.type === 'photo'}
-              disableDragging={el.type === 'placeholder'}
-              enableResizing={el.type !== 'placeholder'}
-              resizeHandleStyles={RESIZE_HANDLES}
-              style={{
-                zIndex: index + 1,
-                outline: selectedId === el.id ? '2px solid #60a5fa' : 'none',
-                outlineOffset: 2,
-                transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined,
-                transformOrigin: 'center center',
-              }}
-              onDragStop={(_, d) => updateEl(el.id, { x: d.x, y: d.y })}
-              onResizeStop={(_, __, ref, ___, pos) => updateEl(el.id, { width: ref.offsetWidth, height: ref.offsetHeight, x: pos.x, y: pos.y })}
-              onClick={e => {
-                e.stopPropagation()
-                if (el.type === 'placeholder') {
-                  placeholderTarget.current = el.id
-                  placeholderInputRef.current?.click()
-                } else if (el.type === 'text') {
-                  setSelectedId(el.id)
-                  setTextOverlayId(el.id)
-                } else {
-                  setSelectedId(el.id)
-                }
-              }}
-            >
-              <div style={{ width: '100%', height: '100%' }}>
-                {el.type === 'photo' && (
-                  <img src={el.imageUrl} alt="" className={`frame-${el.frame || 'none'} filter-${el.filter || 'none'}`} draggable={false}
-                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
-                )}
-                {el.type === 'placeholder' && (
-                  <div style={{ width: '100%', height: '100%', border: '2px dashed #bbb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'rgba(0,0,0,0.02)', userSelect: 'none' }}>
-                    <div style={{ fontSize: 26, color: '#bbb', lineHeight: 1 }}>+</div>
-                    <div style={{ fontSize: 10, color: '#bbb', marginTop: 5 }}>Tap to add photo</div>
-                  </div>
-                )}
-                {el.type === 'emoji' && (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.min(el.width, el.height) * 0.8, lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
-                    {el.content}
-                  </div>
-                )}
-                {el.type === 'text' && (
-                  <div style={{
-                    width: '100%', height: '100%',
-                    fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily,
-                    overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    lineHeight: 1.6, userSelect: 'none', cursor: 'pointer',
-                    pointerEvents: 'none', // clicks fall through to Rnd's onClick
-                  }}>
-                    {el.content || <span style={{ color: '#aaa', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
-                  </div>
-                )}
-              </div>
-            </Rnd>
-          ))}
+      <div
+        style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '12px 4px' }}
+        onClick={deselect}
+      >
+        {/* Wrapper sized to the scaled canvas so layout flow is correct */}
+        <div style={{ width: PAGE_W * scale, height: PAGE_H * scale, position: 'relative', flexShrink: 0 }}
+          onClick={e => e.stopPropagation()}>
 
-          {/*
-           * ── Rotation handle ───────────────────────────────────────────────
-           * Rendered as a sibling of the Rnd elements (not inside them) so it
-           * sits in canvas coordinate space and isn't affected by the element's
-           * own transform. Drag it in a circle around the element to rotate.
-           */}
-          {selected && (() => {
-            const { x: hx, y: hy } = rotHandlePos(selected)
-            return (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: hx, top: hy,
-                  width: 28, height: 28,
-                  borderRadius: '50%',
-                  background: '#3b82f6',
-                  border: '2px solid white',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                  cursor: 'grab',
-                  zIndex: elements.length + 20,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, color: 'white', userSelect: 'none',
-                  touchAction: 'none',
-                }}
-                onPointerDown={e => onRotatePointerDown(selected, e)}
-                onPointerMove={onRotatePointerMove}
-                onPointerUp={onRotatePointerUp}
-              >
-                ↻
-              </div>
-            )
-          })()}
+          {/* The actual canvas — rendered at PAGE_W×PAGE_H then CSS-scaled */}
+          <div
+            ref={canvasRef}
+            style={{
+              position: 'absolute',
+              width: PAGE_W, height: PAGE_H,
+              background,
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            }}
+          >
+            {elements.map((el, index) => {
+              const isSelected = selectedId === el.id
+              const rot = el.rotation || 0
+              return (
+                <div
+                  key={el.id}
+                  style={{
+                    position: 'absolute',
+                    left: el.x, top: el.y,
+                    width: el.width, height: el.height,
+                    transform: rot ? `rotate(${rot}deg)` : undefined,
+                    transformOrigin: 'center center',
+                    outline: isSelected ? '2px solid #60a5fa' : 'none',
+                    outlineOffset: 2,
+                    zIndex: index + 1,
+                    cursor: el.type === 'placeholder' ? 'pointer' : 'grab',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                  }}
+                  onPointerDown={e => elPointerDown(el, e)}
+                  onPointerMove={e => elPointerMove(el, e)}
+                  onPointerUp={e => elPointerUp(el, e)}
+                  onPointerCancel={e => elPointerCancel(el, e)}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Content */}
+                  {el.type === 'photo' && (
+                    <img src={el.imageUrl} alt=""
+                      className={`frame-${el.frame || 'none'} filter-${el.filter || 'none'}`}
+                      draggable={false}
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
+                  )}
+                  {el.type === 'placeholder' && (
+                    <div style={{ width: '100%', height: '100%', border: '2px dashed #bbb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.02)' }}>
+                      <div style={{ fontSize: 26, color: '#bbb', lineHeight: 1 }}>+</div>
+                      <div style={{ fontSize: 10, color: '#bbb', marginTop: 5 }}>Tap to add photo</div>
+                    </div>
+                  )}
+                  {el.type === 'emoji' && (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.min(el.width, el.height) * 0.8, lineHeight: 1, pointerEvents: 'none' }}>
+                      {el.content}
+                    </div>
+                  )}
+                  {el.type === 'text' && (
+                    <div style={{ width: '100%', height: '100%', fontSize: el.fontSize, color: el.color, fontFamily: el.fontFamily, overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6, pointerEvents: 'none' }}>
+                      {el.content || <span style={{ color: '#aaa', fontStyle: 'italic', fontSize: Math.min(el.fontSize, 13) }}>Tap to edit…</span>}
+                    </div>
+                  )}
+
+                  {/* Desktop corner resize handles (mouse only — touch uses pinch) */}
+                  {isSelected && el.type !== 'placeholder' && ['nw','ne','se','sw'].map(corner => (
+                    <div key={corner}
+                      style={{
+                        position: 'absolute',
+                        left: corner.includes('e') ? el.width - 6 : -6,
+                        top: corner.includes('s') ? el.height - 6 : -6,
+                        width: 12, height: 12,
+                        background: 'white', border: '2px solid #60a5fa', borderRadius: '50%',
+                        zIndex: 10, touchAction: 'none',
+                        cursor: `${corner}-resize`,
+                      }}
+                      onPointerDown={e => {
+                        if (e.pointerType === 'touch') return
+                        e.stopPropagation()
+                        resDown(el, corner, e)
+                      }}
+                      onPointerMove={e => resMove(e)}
+                      onPointerUp={e => resUp(e)}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+
+            {/* Rotation handle — always visible when element is selected */}
+            {selected && selected.type !== 'placeholder' && (() => {
+              const { x, y } = rotPos(selected)
+              return (
+                <div
+                  style={{
+                    position: 'absolute', left: x, top: y,
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: '#3b82f6', border: '2px solid white',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.45)',
+                    cursor: 'grab', zIndex: elements.length + 20,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, color: 'white', userSelect: 'none', touchAction: 'none',
+                  }}
+                  onPointerDown={e => rotDown(selected, e)}
+                  onPointerMove={e => rotMove(e)}
+                  onPointerUp={e => rotUp(e)}
+                  onClick={e => e.stopPropagation()}
+                >
+                  ↻
+                </div>
+              )
+            })()}
+          </div>
         </div>
       </div>
     </div>
