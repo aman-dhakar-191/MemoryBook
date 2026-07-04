@@ -37,6 +37,41 @@ const LAYOUTS = [
   { id: 'grid', label: 'Grid 2×2', slots: [{ x: G, y: G, w: hw, h: hh }, { x: G * 2 + hw, y: G, w: hw, h: hh }, { x: G, y: G * 2 + hh, w: hw, h: hh }, { x: G * 2 + hw, y: G * 2 + hh, w: hw, h: hh }] },
   { id: 'three-col', label: '3 Cols', slots: [{ x: G, y: G, w: tw, h: CH - G * 2 }, { x: G * 2 + tw, y: G, w: tw, h: CH - G * 2 }, { x: G * 3 + tw * 2, y: G, w: tw, h: CH - G * 2 }] },
   { id: 'three-row', label: '3 Rows', slots: [{ x: G, y: G, w: PAGE_W - G * 2, h: th }, { x: G, y: G * 2 + th, w: PAGE_W - G * 2, h: th }, { x: G, y: G * 3 + th * 2, w: PAGE_W - G * 2, h: th }] },
+  {
+    id: 'featured-right', label: 'Featured Right',
+    slots: [
+      { x: G, y: G, w: Math.floor((PAGE_W - G * 3) * 0.4), h: hh },
+      { x: G, y: G * 2 + hh, w: Math.floor((PAGE_W - G * 3) * 0.4), h: hh },
+      { x: G * 2 + Math.floor((PAGE_W - G * 3) * 0.4), y: G, w: Math.floor((PAGE_W - G * 3) * 0.6), h: CH - G * 2 },
+    ],
+  },
+  {
+    id: 'two-three', label: '2 + 3',
+    slots: [
+      { x: G, y: G, w: hw, h: hh },
+      { x: G * 2 + hw, y: G, w: hw, h: hh },
+      { x: G, y: G * 2 + hh, w: tw, h: hh },
+      { x: G * 2 + tw, y: G * 2 + hh, w: tw, h: hh },
+      { x: G * 3 + tw * 2, y: G * 2 + hh, w: tw, h: hh },
+    ],
+  },
+  {
+    id: 'top-strip', label: 'Top + Strip',
+    slots: [
+      { x: G, y: G, w: PAGE_W - G * 2, h: Math.floor((CH - G * 3) * 0.62) },
+      { x: G, y: G * 2 + Math.floor((CH - G * 3) * 0.62), w: tw, h: Math.floor((CH - G * 3) * 0.38) },
+      { x: G * 2 + tw, y: G * 2 + Math.floor((CH - G * 3) * 0.62), w: tw, h: Math.floor((CH - G * 3) * 0.38) },
+      { x: G * 3 + tw * 2, y: G * 2 + Math.floor((CH - G * 3) * 0.62), w: tw, h: Math.floor((CH - G * 3) * 0.38) },
+    ],
+  },
+  {
+    id: 'grid-3x3', label: 'Grid 3×3',
+    slots: [
+      { x: G,        y: G,        w: tw, h: th }, { x: G*2+tw,   y: G,        w: tw, h: th }, { x: G*3+tw*2, y: G,        w: tw, h: th },
+      { x: G,        y: G*2+th,   w: tw, h: th }, { x: G*2+tw,   y: G*2+th,   w: tw, h: th }, { x: G*3+tw*2, y: G*2+th,   w: tw, h: th },
+      { x: G,        y: G*3+th*2, w: tw, h: th }, { x: G*2+tw,   y: G*3+th*2, w: tw, h: th }, { x: G*3+tw*2, y: G*3+th*2, w: tw, h: th },
+    ],
+  },
 ]
 
 const BACKGROUNDS = [
@@ -46,12 +81,13 @@ const BACKGROUNDS = [
   { color: '#1e1e2e', label: 'Night' },
 ]
 
-const FRAMES = ['none','classic','polaroid','vintage','rounded','gold','shadow','thin','film','double']
+const FRAMES = ['none','classic','polaroid','vintage','rounded','gold','shadow','thin','film','double','circle','oval','arch','diamond','hex','star']
 
 const FILTERS = [
   { id: 'none', label: 'Normal' }, { id: 'bw', label: 'B&W' }, { id: 'sepia', label: 'Sepia' },
   { id: 'warm', label: 'Warm' }, { id: 'cool', label: 'Cool' }, { id: 'faded', label: 'Faded' },
   { id: 'vivid', label: 'Vivid' }, { id: 'dramatic', label: 'Dramatic' },
+  { id: 'blur-sm', label: 'Blur S' }, { id: 'blur-md', label: 'Blur M' },
 ]
 
 const FONTS = ['Inter', 'Playfair Display', 'Georgia', 'Courier New']
@@ -129,7 +165,25 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setElements(prev => prev.filter(e => e.id !== selectedId))
     setSelectedId(null); setTextOverlayId(null)
   }
-  function move(dir) {
+  function bringToFront() {
+    setElements(prev => {
+      const i = prev.findIndex(e => e.id === selectedId)
+      if (i < 0 || i === prev.length - 1) return prev
+      const next = [...prev]
+      const [el] = next.splice(i, 1)
+      return [...next, el]
+    })
+  }
+  function sendToBack() {
+    setElements(prev => {
+      const i = prev.findIndex(e => e.id === selectedId)
+      if (i <= 0) return prev
+      const next = [...prev]
+      const [el] = next.splice(i, 1)
+      return [el, ...next]
+    })
+  }
+  function moveStep(dir) {
     setElements(prev => {
       const i = prev.findIndex(e => e.id === selectedId)
       if (i < 0) return prev
@@ -478,8 +532,10 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                 </>
               )}
               {divider}
-              <button onClick={() => move(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }} title="Send backward">↓</button>
-              <button onClick={() => move(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: '0 2px', flexShrink: 0 }} title="Bring forward">↑</button>
+              <button onClick={() => moveStep(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0 }} title="Move backward one step">↓</button>
+              <button onClick={() => moveStep(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0 }} title="Move forward one step">↑</button>
+              <button onClick={sendToBack} style={{ color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', flexShrink: 0 }} title="Send to back">⬇Back</button>
+              <button onClick={bringToFront} style={{ color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', flexShrink: 0 }} title="Bring to front">⬆Front</button>
               <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px', flexShrink: 0 }}>✕</button>
             </>
           )}
