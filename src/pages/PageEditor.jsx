@@ -263,12 +263,23 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       if (!p) return
       const dx = (e.clientX - p.startCX) / scale
       const dy = (e.clientY - p.startCY) / scale
-      if (!g.moved && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) g.moved = true
+      if (!g.moved && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) g.moved = true
       if (g.moved) {
-        updateEl(el.id, {
+        pendingUpdateRef.current = {
+          id: el.id,
           x: Math.max(-el.width + 20, Math.min(PAGE_W - 20, p.startElX + dx)),
           y: Math.max(-el.height + 20, Math.min(PAGE_H - 20, p.startElY + dy)),
-        })
+        }
+        if (!rafRef.current) {
+          rafRef.current = requestAnimationFrame(() => {
+            if (pendingUpdateRef.current) {
+              const { id, ...patch } = pendingUpdateRef.current
+              updateEl(id, patch)
+              pendingUpdateRef.current = null
+            }
+            rafRef.current = null
+          })
+        }
       }
     } else if (g.type === 'pinch') {
       const ep = ptrs.current.filter(p => p.elId === el.id)
@@ -282,7 +293,17 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       const newH = g.keepAspect
         ? Math.round(newW * g.startH / g.startW)
         : Math.max(40, Math.round(g.startH * sf))
-      updateEl(el.id, { width: newW, height: newH, rotation: Math.round(g.startRot + dAngle) })
+      pendingUpdateRef.current = { id: el.id, width: newW, height: newH, rotation: Math.round(g.startRot + dAngle) }
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          if (pendingUpdateRef.current) {
+            const { id, ...patch } = pendingUpdateRef.current
+            updateEl(id, patch)
+            pendingUpdateRef.current = null
+          }
+          rafRef.current = null
+        })
+      }
     }
   }
 
@@ -290,16 +311,21 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     const ptr = ptrs.current.find(p => p.pointerId === e.pointerId)
     const g = gesture.current
 
-    // Tap: no movement, quick
-    if (ptr && g?.type === 'drag' && !g.moved && Date.now() - ptr.startTime < 400) {
-      if (el.type === 'placeholder') {
-        placeholderTarget.current = el.id
-        placeholderInputRef.current?.click()
-      } else if (el.type === 'text') {
-        setSelectedId(el.id)
-        setTextOverlayId(el.id)
-      } else {
-        setSelectedId(el.id)
+    // Tap: check final distance from start — more reliable than incremental moved flag
+    // (avoids false positives from Android touch jitter during finger placement)
+    if (ptr && g?.type === 'drag' && g.pointerId === e.pointerId) {
+      const dist = Math.hypot(e.clientX - ptr.startCX, e.clientY - ptr.startCY)
+      const elapsed = Date.now() - ptr.startTime
+      if (dist < 12 && elapsed < 500) {
+        if (el.type === 'placeholder') {
+          placeholderTarget.current = el.id
+          placeholderInputRef.current?.click()
+        } else if (el.type === 'text') {
+          setSelectedId(el.id)
+          setTextOverlayId(el.id)
+        } else {
+          setSelectedId(el.id)
+        }
       }
     }
 
@@ -349,6 +375,8 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   // ── Desktop corner resize handles ─────────────────────────────────────────
   const resG = useRef(null)
+  const rafRef = useRef(null)
+  const pendingUpdateRef = useRef(null)
 
   function resDown(el, corner, e) {
     e.stopPropagation()
@@ -385,6 +413,19 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     return {
       x: el.x + el.width / 2 + dist * Math.sin(rot) - 14,
       y: el.y + el.height / 2 - dist * Math.cos(rot) - 14,
+    }
+  }
+
+  // ── Delete button position — rotated top-right corner ─────────────────────
+  function deleteButtonPos(el) {
+    const rot = (el.rotation || 0) * Math.PI / 180
+    const cx = el.x + el.width / 2
+    const cy = el.y + el.height / 2
+    const dx = el.width / 2
+    const dy = -el.height / 2
+    return {
+      x: cx + dx * Math.cos(rot) - dy * Math.sin(rot) - 12,
+      y: cy + dx * Math.sin(rot) + dy * Math.cos(rot) - 12,
     }
   }
 
@@ -644,6 +685,29 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
                   onClick={e => e.stopPropagation()}
                 >
                   ↻
+                </div>
+              )
+            })()}
+
+            {/* Delete button — red ✕ at rotated top-right corner */}
+            {selected && selected.type !== 'placeholder' && (() => {
+              const { x, y } = deleteButtonPos(selected)
+              return (
+                <div
+                  style={{
+                    position: 'absolute', left: x, top: y,
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: '#ef4444', border: '2px solid white',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.45)',
+                    cursor: 'pointer', zIndex: elements.length + 21,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700, color: 'white',
+                    userSelect: 'none', touchAction: 'none',
+                  }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={e => { e.stopPropagation(); deleteSelected() }}
+                >
+                  ✕
                 </div>
               )
             })()}
