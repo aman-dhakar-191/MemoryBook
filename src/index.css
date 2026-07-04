@@ -64,3 +64,13 @@ body {
 .filter-faded    { filter: contrast(82%) brightness(1.12) saturate(72%); }
 .filter-vivid    { filter: saturate(160%) contrast(112%); }
 .filter-dramatic { filter: contrast(145%) brightness(0.88) saturate(75%); }
+.filter-blur-sm  { filter: blur(3px); }
+.filter-blur-md  { filter: blur(8px); }
+
+/* ── Shaped frames ── */
+.frame-circle  { border-radius: 50%; overflow: hidden; }
+.frame-oval    { border-radius: 50% / 40%; overflow: hidden; }
+.frame-arch    { border-radius: 50% 50% 0 0 / 45% 45% 0 0; overflow: hidden; border: 6px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.frame-diamond { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); overflow: hidden; }
+.frame-hex     { clip-path: polygon(25% 5%, 75% 5%, 98% 50%, 75% 95%, 25% 95%, 2% 50%); overflow: hidden; }
+.frame-star    { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); overflow: hidden; }
