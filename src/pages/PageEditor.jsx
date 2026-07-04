@@ -243,12 +243,17 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   const { getInputProps, open } = useDropzone({ onDrop, accept: { 'image/*': [] }, noClick: true, maxSize: 20 * 1024 * 1024 })
 
+  function openTextOverlay(id) {
+    overlayOpenTimeRef.current = Date.now()
+    setTextOverlayId(id)
+  }
+
   function addText() {
     const id = uuid()
     const el = { id, type: 'text', content: '', fontSize: 18, color: '#333333', fontFamily: 'Inter', x: 60, y: 60, width: 240, height: 80, rotation: 0 }
     setElements(prev => [...prev, el])
     setSelectedId(id)
-    setTextOverlayId(id)
+    openTextOverlay(id)
   }
 
   function addEmoji(emoji) {
@@ -272,6 +277,10 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   // Single pointer → tap to select / drag to move.
 
   function elPointerDown(el, e) {
+    // Prevent the browser's synthetic click that fires after pointerup on touch/pen.
+    // Without this, the click lands on the overlay backdrop (which is now rendered on top)
+    // and immediately closes the text overlay that was just opened in elPointerUp.
+    if (e.pointerType !== 'mouse') e.preventDefault()
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
 
@@ -376,7 +385,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
           placeholderInputRef.current?.click()
         } else if (el.type === 'text') {
           setSelectedId(el.id)
-          setTextOverlayId(el.id)
+          openTextOverlay(el.id)
         } else {
           setSelectedId(el.id)
         }
@@ -431,6 +440,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const resG = useRef(null)
   const rafRef = useRef(null)
   const pendingUpdateRef = useRef(null)
+  const overlayOpenTimeRef = useRef(0)
 
   function resDown(el, corner, e) {
     e.stopPropagation()
@@ -523,7 +533,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               )}
               {selected.type === 'text' && (
                 <>
-                  <button onClick={() => setTextOverlayId(selected.id)} style={btn({ background: '#7c3aed', color: 'white' })}>✎ Edit</button>
+                  <button onClick={() => openTextOverlay(selected.id)} style={btn({ background: '#7c3aed', color: 'white' })}>✎ Edit</button>
                   <select value={selected.fontFamily} onChange={e => updateEl(selected.id, { fontFamily: e.target.value })} style={sel({ maxWidth: 110 })}>
                     {FONTS.map(f => <option key={f}>{f}</option>)}
                   </select>
@@ -587,7 +597,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       {/* ── Text editing overlay ── */}
       {textOverlayEl && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.65)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-          onClick={() => setTextOverlayId(null)}>
+          onClick={() => { if (Date.now() - overlayOpenTimeRef.current > 350) setTextOverlayId(null) }}>
           <div style={{ background: '#1c1c1c', borderRadius: '16px 16px 0 0', padding: '14px 16px max(28px, env(safe-area-inset-bottom))' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
