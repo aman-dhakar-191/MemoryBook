@@ -134,6 +134,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [saving, setSaving] = useState(false)
   const [showLayouts, setShowLayouts] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
+  const [showBG, setShowBG] = useState(false)
   const [scale, setScale] = useState(1)
 
   const canvasRef = useRef(null)
@@ -155,7 +156,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const selected = elements.find(e => e.id === selectedId)
   const textOverlayEl = elements.find(e => e.id === textOverlayId)
 
-  function closeSheets() { setShowLayouts(false); setShowStickers(false) }
+  function closeSheets() { setShowLayouts(false); setShowStickers(false); setShowBG(false) }
   function deselect() { setSelectedId(null); setTextOverlayId(null); closeSheets() }
 
   function updateEl(id, patch) {
@@ -510,45 +511,12 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
             {uploading ? `↑${uploadCount.done}/${uploadCount.total}` : '+ Photos'}
           </button>
           <button onClick={addText} style={btn({ background: '#7c3aed', color: 'white' })}>+ Text</button>
-          <button onClick={() => { setShowStickers(v => !v); setShowLayouts(false) }} style={btn({ background: '#b45309', color: 'white' })}>😊 Sticker</button>
-          <button onClick={() => { setShowLayouts(v => !v); setShowStickers(false) }} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
-          {divider}
-          <span style={{ color: '#666', fontSize: 11, flexShrink: 0 }}>BG</span>
-          {BACKGROUNDS.map(bg => (
-            <button key={bg.color} title={bg.label} onClick={() => setBackground(bg.color)}
-              style={{ width: 18, height: 18, borderRadius: '50%', background: bg.color, border: background === bg.color ? '2px solid white' : '2px solid #444', transform: background === bg.color ? 'scale(1.25)' : 'scale(1)', transition: 'all .15s', cursor: 'pointer', flexShrink: 0 }} />
-          ))}
-          {selected && (
-            <>
-              {divider}
-              {selected.type === 'photo' && (
-                <>
-                  <select value={selected.frame || 'none'} onChange={e => updateEl(selected.id, { frame: e.target.value })} style={sel()}>
-                    {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                  <select value={selected.filter || 'none'} onChange={e => updateEl(selected.id, { filter: e.target.value })} style={sel()}>
-                    {FILTERS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                  </select>
-                </>
-              )}
-              {selected.type === 'text' && (
-                <>
-                  <button onClick={() => openTextOverlay(selected.id)} style={btn({ background: '#7c3aed', color: 'white' })}>✎ Edit</button>
-                  <select value={selected.fontFamily} onChange={e => updateEl(selected.id, { fontFamily: e.target.value })} style={sel({ maxWidth: 110 })}>
-                    {FONTS.map(f => <option key={f}>{f}</option>)}
-                  </select>
-                  <input type="number" value={selected.fontSize} min={10} max={96} onChange={e => updateEl(selected.id, { fontSize: +e.target.value })} style={sel({ width: 46 })} />
-                  <input type="color" value={selected.color} onChange={e => updateEl(selected.id, { color: e.target.value })} style={{ width: 26, height: 26, border: 'none', cursor: 'pointer', borderRadius: 4, flexShrink: 0 }} />
-                </>
-              )}
-              {divider}
-              <button onClick={() => moveStep(-1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0 }} title="Move backward one step">↓</button>
-              <button onClick={() => moveStep(1)} style={{ color: '#888', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px', flexShrink: 0 }} title="Move forward one step">↑</button>
-              <button onClick={sendToBack} style={{ color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', flexShrink: 0 }} title="Send to back">⬇Back</button>
-              <button onClick={bringToFront} style={{ color: '#aaa', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: '0 2px', flexShrink: 0 }} title="Bring to front">⬆Front</button>
-              <button onClick={deleteSelected} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '0 2px', flexShrink: 0 }}>✕</button>
-            </>
-          )}
+          <button onClick={() => { setShowStickers(v => !v); setShowLayouts(false); setShowBG(false) }} style={btn({ background: '#b45309', color: 'white' })}>😊</button>
+          <button onClick={() => { setShowLayouts(v => !v); setShowStickers(false); setShowBG(false) }} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
+          <button onClick={() => { setShowBG(v => !v); setShowLayouts(false); setShowStickers(false) }}
+            style={btn({ background: showBG ? '#4b5563' : '#374151', color: 'white', outline: showBG ? '2px solid #60a5fa' : 'none', outlineOffset: 1 })}>
+            🎨 BG
+          </button>
         </div>
         <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
         <button onClick={handleSave} disabled={saving}
@@ -558,7 +526,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       </div>
 
       {/* ── Backdrop ── */}
-      {(showLayouts || showStickers) && (
+      {(showLayouts || showStickers || showBG) && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 90, background: 'rgba(0,0,0,0.55)' }} onClick={closeSheets} />
       )}
 
@@ -576,6 +544,31 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ── BG color sheet ── */}
+      {showBG && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100, background: '#1c1c1c', borderRadius: '16px 16px 0 0', padding: '14px 20px max(28px, env(safe-area-inset-bottom))' }}>
+          <div style={{ width: 36, height: 4, background: '#444', borderRadius: 2, margin: '0 auto 14px' }} />
+          <p style={{ color: '#888', fontSize: 12, textAlign: 'center', marginBottom: 16 }}>Background</p>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, flexWrap: 'wrap' }}>
+            {BACKGROUNDS.map(bg => (
+              <button key={bg.color} title={bg.label}
+                onClick={() => { setBackground(bg.color); setShowBG(false) }}
+                style={{
+                  width: 48, height: 48, borderRadius: '50%', background: bg.color,
+                  border: background === bg.color ? '3px solid #60a5fa' : '3px solid #333',
+                  transform: background === bg.color ? 'scale(1.15)' : 'scale(1)',
+                  transition: 'all .15s', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              />
+            ))}
+          </div>
+          <p style={{ color: '#555', fontSize: 11, textAlign: 'center', marginTop: 12 }}>
+            {BACKGROUNDS.find(b => b.color === background)?.label}
+          </p>
         </div>
       )}
 
@@ -780,6 +773,65 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
           </div>
         </div>
       </div>
+
+      {/* ── Bottom element bar (shown when an element is selected) ── */}
+      {selected && selected.type !== 'placeholder' && (
+        <div style={{
+          flexShrink: 0,
+          background: '#1a1a1a',
+          borderTop: '1px solid #2a2a2a',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '0 8px',
+          paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
+          minHeight: 52,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'none',
+        }}>
+          {selected.type === 'photo' && (
+            <>
+              <select value={selected.frame || 'none'} onChange={e => updateEl(selected.id, { frame: e.target.value })} style={sel({ maxWidth: 90 })}>
+                {FRAMES.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <select value={selected.filter || 'none'} onChange={e => updateEl(selected.id, { filter: e.target.value })} style={sel({ maxWidth: 80 })}>
+                {FILTERS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+              </select>
+              {divider}
+            </>
+          )}
+          {selected.type === 'text' && (
+            <>
+              <button onClick={() => openTextOverlay(selected.id)} style={btn({ background: '#7c3aed', color: 'white' })}>✎ Edit</button>
+              <select value={selected.fontFamily} onChange={e => updateEl(selected.id, { fontFamily: e.target.value })} style={sel({ maxWidth: 110 })}>
+                {FONTS.map(f => <option key={f}>{f}</option>)}
+              </select>
+              <input type="number" value={selected.fontSize} min={10} max={96}
+                onChange={e => updateEl(selected.id, { fontSize: +e.target.value })}
+                style={sel({ width: 46 })} />
+              <input type="color" value={selected.color}
+                onChange={e => updateEl(selected.id, { color: e.target.value })}
+                style={{ width: 30, height: 30, border: 'none', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} />
+              {divider}
+            </>
+          )}
+          {selected.type === 'emoji' && divider}
+          <button onClick={sendToBack} title="Send to back"
+            style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 7px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>⬇</button>
+          <button onClick={() => moveStep(-1)} title="Move back one"
+            style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', fontSize: 14, padding: '3px 7px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>↓</button>
+          <button onClick={() => moveStep(1)} title="Move forward one"
+            style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#888', fontSize: 14, padding: '3px 7px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>↑</button>
+          <button onClick={bringToFront} title="Bring to front"
+            style={{ background: 'none', border: '1px solid #333', borderRadius: 6, color: '#aaa', fontSize: 11, padding: '5px 7px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>⬆</button>
+          {divider}
+          <button onClick={deleteSelected}
+            style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: 6, color: '#ef4444', fontSize: 12, fontWeight: 600, padding: '5px 12px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>
+            ✕ Delete
+          </button>
+        </div>
+      )}
     </div>
   )
 }

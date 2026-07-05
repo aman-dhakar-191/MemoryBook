@@ -2,9 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   font-family: 'Inter', sans-serif;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
+
+button, select, input {
+  touch-action: manipulation;
+  font-family: inherit;
+}
+
+/* Hide scrollbars on mobile panels */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { scrollbar-width: none; }
 
 /* ── Frames ── */
 .frame-classic {
