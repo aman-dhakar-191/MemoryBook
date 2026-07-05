@@ -130,16 +130,21 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
       <input {...getCoverInputProps()} />
 
       {/* Top bar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
-      }}>
-        <button onClick={onBack} style={{ color: '#fbbf24', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
-          ← Albums
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'Playfair Display, serif', color: '#fde68a', fontSize: 15 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        {/* Row 1: Back | Title | Cover */}
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', gap: 8 }}>
+          <button onClick={onBack} style={{ color: '#fbbf24', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+            ← Albums
+          </button>
+          <span
+            title={album.title}
+            style={{
+              flex: 1, textAlign: 'center',
+              fontFamily: 'Inter, sans-serif', fontWeight: 600,
+              color: '#fde68a', fontSize: 17,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
             {album.title}
           </span>
           <button
@@ -149,16 +154,16 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
               fontSize: 11, color: '#c9a878',
               background: 'rgba(255,255,255,0.07)',
               border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 6, padding: '4px 9px', cursor: 'pointer',
+              borderRadius: 6, padding: '4px 9px', cursor: 'pointer', flexShrink: 0,
             }}
           >
-            {uploadingCover ? 'Uploading…' : '🖼️ Cover'}
+            {uploadingCover ? '↑…' : '🖼️ Cover'}
           </button>
         </div>
-
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        {/* Row 2: secondary actions (right-aligned) */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0 12px 8px', gap: 8 }}>
           {deleteError && (
-            <span style={{ fontSize: 11, color: '#fca5a5' }}>⚠️ {deleteError}</span>
+            <span style={{ fontSize: 11, color: '#fca5a5', flex: 1 }}>⚠️ {deleteError}</span>
           )}
           {confirmDelete ? (
             <>

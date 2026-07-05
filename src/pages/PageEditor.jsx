@@ -567,6 +567,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
             {uploading ? `↑${uploadCount.done}/${uploadCount.total}` : '+ Photos'}
           </button>
           <button onClick={addText} style={btn({ background: '#7c3aed', color: 'white' })}>+ Text</button>
+          {divider}
           <button onClick={() => { setShowStickers(v => !v); setShowLayouts(false); setShowBG(false) }} style={btn({ background: '#b45309', color: 'white' })}>😊</button>
           <button onClick={() => { setShowLayouts(v => !v); setShowStickers(false); setShowBG(false) }} style={btn({ background: '#0f766e', color: 'white' })}>⋎ Layout</button>
           <button onClick={() => { setShowBG(v => !v); setShowLayouts(false); setShowStickers(false) }}
