@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { useDropzone } from 'react-dropzone'
-import { getPages, addPage, updateAlbum, deleteAlbumWithPages } from '../firebase/firestore'
+import { subscribePages, addPage, updateAlbum, deleteAlbumWithPages } from '../firebase/firestore'
 import { uploadPhoto } from '../firebase/storage'
 import BookPage from '../components/BookPage'
 import PageEditor from './PageEditor'
@@ -34,7 +34,12 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
   }, [])
 
   useEffect(() => {
-    getPages(album.id).then(setPages).finally(() => setLoading(false))
+    setLoading(true)
+    const unsub = subscribePages(album.id, pages => {
+      setPages(pages)
+      setLoading(false)
+    })
+    return unsub
   }, [album.id])
 
   async function handleAddPage() {
@@ -42,8 +47,7 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
     setPages(prev => [...prev, page])
   }
 
-  function handlePageSaved(updated) {
-    setPages(prev => prev.map(p => p.id === updated.id ? updated : p))
+  function handlePageSaved() {
     setEditingPage(null)
   }
 
