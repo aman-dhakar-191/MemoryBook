@@ -132,6 +132,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [uploading, setUploading] = useState(false)
   const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 })
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const [showLayouts, setShowLayouts] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
   const [showBG, setShowBG] = useState(false)
@@ -226,21 +227,31 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const onDrop = useCallback(async accepted => {
     if (!accepted.length) return
     setUploading(true)
+    setSaveError(null)
     setUploadCount({ done: 0, total: accepted.length })
     const newEls = []
-    for (let i = 0; i < accepted.length; i++) {
-      const { url, path } = await uploadPhoto(accepted[i], null, `memorybook/${album.id}`)
-      const { w, h } = await getImageDimensions(url)
-      const ratio = w / h
-      const maxW = 240, maxH = 220
-      let elW = maxW, elH = maxW / ratio
-      if (elH > maxH) { elH = maxH; elW = maxH * ratio }
-      newEls.push({ id: uuid(), type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none', x: 30 + i * 22, y: 30 + i * 22, width: Math.round(elW), height: Math.round(elH), rotation: 0 })
-      setUploadCount({ done: i + 1, total: accepted.length })
+    try {
+      for (let i = 0; i < accepted.length; i++) {
+        try {
+          const { url, path } = await uploadPhoto(accepted[i], null, `memorybook/${album.id}`)
+          const { w, h } = await getImageDimensions(url)
+          const ratio = w / h
+          const maxW = 240, maxH = 220
+          let elW = maxW, elH = maxW / ratio
+          if (elH > maxH) { elH = maxH; elW = maxH * ratio }
+          newEls.push({ id: uuid(), type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none', x: 30 + i * 22, y: 30 + i * 22, width: Math.round(elW), height: Math.round(elH), rotation: 0 })
+          setUploadCount({ done: i + 1, total: accepted.length })
+        } catch (err) {
+          setSaveError(`Photo ${i + 1} failed to upload: ${err.message}`)
+        }
+      }
+    } finally {
+      if (newEls.length) {
+        setElements(prev => [...prev, ...newEls])
+        setSelectedId(newEls[newEls.length - 1].id)
+      }
+      setUploading(false)
     }
-    setElements(prev => [...prev, ...newEls])
-    setSelectedId(newEls[newEls.length - 1]?.id ?? null)
-    setUploading(false)
   }, [album.id])
 
   const { getInputProps, open } = useDropzone({ onDrop, accept: { 'image/*': [] }, noClick: true, maxSize: 20 * 1024 * 1024 })
@@ -276,12 +287,14 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
   async function handleSave() {
     document.activeElement?.blur()
-    setSaving(true); setTextOverlayId(null)
+    setSaving(true); setSaveError(null); setTextOverlayId(null)
     try {
       const els = saveableElements()
       await updatePage(album.id, page.id, { elements: els, background })
       savedStateRef.current = { elements: JSON.stringify(els), background }
       onSave()
+    } catch (err) {
+      setSaveError(`Save failed: ${err.message}`)
     } finally { setSaving(false) }
   }
 
@@ -567,6 +580,16 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
           {saving ? '✓…' : 'Save'}
         </button>
       </div>
+
+      {/* ── Error banner ── */}
+      {saveError && (
+        <div style={{ background: '#7f1d1d', color: '#fecaca', padding: '10px 16px', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+          <span>⚠️ {saveError}</span>
+          <button onClick={handleSave} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, padding: '3px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* ── Backdrop ── */}
       {(showLayouts || showStickers || showBG) && (
