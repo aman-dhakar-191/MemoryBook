@@ -1,8 +1,13 @@
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, getDocs, onSnapshot, orderBy, query, serverTimestamp,
+  doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './config'
+
+export async function getAlbum(albumId) {
+  const snap = await getDoc(doc(db, 'albums', albumId))
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null
+}
 
 export async function getAlbums() {
   const snap = await getDocs(query(collection(db, 'albums'), orderBy('createdAt', 'desc')))
