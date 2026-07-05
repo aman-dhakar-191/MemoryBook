@@ -16,11 +16,12 @@ const FlipPage = React.forwardRef(({ children, style }, ref) => (
 ))
 FlipPage.displayName = 'FlipPage'
 
-export default function BookView({ album, onBack, onAlbumUpdate }) {
+export default function BookView({ album, onBack, onAlbumUpdate, initialEditPageId, onEditorPageCleared }) {
   const bookRef = useRef()
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPage, setEditingPage] = useState(null)
+  const pendingEditPageIdRef = useRef(initialEditPageId)
   const [coverUrl, setCoverUrl] = useState(album.coverUrl || null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
@@ -38,18 +39,44 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
     const unsub = subscribePages(album.id, pages => {
       setPages(pages)
       setLoading(false)
+      // Restore editor state from URL (e.g. after reload on edit page)
+      if (pendingEditPageIdRef.current) {
+        const page = pages.find(p => p.id === pendingEditPageIdRef.current)
+        if (page) {
+          openPageEditor(page)
+          pendingEditPageIdRef.current = null
+          onEditorPageCleared?.()
+        }
+      }
     })
     return unsub
   }, [album.id])
+
+  function openPageEditor(page) {
+    history.pushState({ albumId: album.id, pageId: page.id }, '', `#/${album.id}/edit/${page.id}`)
+    setEditingPage(page)
+  }
+
+  function closeEditor() {
+    history.pushState({ albumId: album.id }, '', `#/${album.id}`)
+    setEditingPage(null)
+  }
 
   async function handleAddPage() {
     const page = await addPage(album.id, pages.length)
     setPages(prev => [...prev, page])
   }
 
-  function handlePageSaved() {
-    setEditingPage(null)
-  }
+  // Handle Android back button from editor → album view
+  useEffect(() => {
+    if (!editingPage) return
+    const onPop = () => {
+      const hash = window.location.hash
+      if (!hash.includes('/edit/')) setEditingPage(null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [editingPage])
 
   async function handleDeleteAlbum() {
     setDeleting(true)
@@ -87,8 +114,8 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
       <PageEditor
         album={album}
         page={editingPage}
-        onSave={handlePageSaved}
-        onCancel={() => setEditingPage(null)}
+        onSave={closeEditor}
+        onCancel={closeEditor}
       />
     )
   }
@@ -197,7 +224,7 @@ export default function BookView({ album, onBack, onAlbumUpdate }) {
             ) : (
               pages.map((page, i) => (
                 <FlipPage key={page.id} style={{ background: page.background || '#fffdf8', position: 'relative' }}>
-                  <BookPage page={page} pageNumber={i + 1} canvasW={PAGE_W} canvasH={PAGE_H} onEdit={() => setEditingPage(page)} />
+                  <BookPage page={page} pageNumber={i + 1} canvasW={PAGE_W} canvasH={PAGE_H} onEdit={() => openPageEditor(page)} />
                 </FlipPage>
               ))
             )}

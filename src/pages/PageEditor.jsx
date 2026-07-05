@@ -135,6 +135,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const [showLayouts, setShowLayouts] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
   const [showBG, setShowBG] = useState(false)
+  const [showSavePrompt, setShowSavePrompt] = useState(false)
   const [scale, setScale] = useState(1)
 
   const canvasRef = useRef(null)
@@ -266,8 +267,36 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   // Strip placeholder slots — they're edit-time UI only, not persistent data
   const saveableElements = () => elements.filter(e => e.type !== 'placeholder')
 
+  function isDirty() {
+    return (
+      JSON.stringify(saveableElements()) !== savedStateRef.current.elements ||
+      background !== savedStateRef.current.background
+    )
+  }
+
   async function handleSave() {
     document.activeElement?.blur()
+    setSaving(true); setTextOverlayId(null)
+    try {
+      const els = saveableElements()
+      await updatePage(album.id, page.id, { elements: els, background })
+      savedStateRef.current = { elements: JSON.stringify(els), background }
+      onSave()
+    } finally { setSaving(false) }
+  }
+
+  // "← Back" — prompt if dirty, otherwise just close
+  function handleBack() {
+    document.activeElement?.blur()
+    if (isDirty()) {
+      setShowSavePrompt(true)
+    } else {
+      onCancel()
+    }
+  }
+
+  async function confirmSaveAndBack() {
+    setShowSavePrompt(false)
     setSaving(true); setTextOverlayId(null)
     try {
       const els = saveableElements()
@@ -276,13 +305,9 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     } finally { setSaving(false) }
   }
 
-  // Auto-save on back — fire-and-forget so navigation is instant
-  function handleBack() {
-    document.activeElement?.blur()
-    setTextOverlayId(null)
-    const els = saveableElements()
-    updatePage(album.id, page.id, { elements: els, background }).catch(console.error)
-    onSave()
+  function confirmDiscard() {
+    setShowSavePrompt(false)
+    onCancel()
   }
 
   // ── Gesture system (replaces react-rnd) ───────────────────────────────────
@@ -455,6 +480,11 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
   const rafRef = useRef(null)
   const pendingUpdateRef = useRef(null)
   const overlayOpenTimeRef = useRef(0)
+  // Track saved state for dirty check
+  const savedStateRef = useRef({
+    elements: JSON.stringify((page.elements || []).filter(e => e.type !== 'placeholder')),
+    background: page.background || '#fffdf8',
+  })
 
   function resDown(el, corner, e) {
     e.stopPropagation()
@@ -843,6 +873,27 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
             style={{ background: '#7f1d1d', border: '1px solid #ef4444', borderRadius: 6, color: '#ef4444', fontSize: 12, fontWeight: 600, padding: '5px 12px', cursor: 'pointer', flexShrink: 0, WebkitTapHighlightColor: 'transparent' }}>
             ✕ Delete
           </button>
+        </div>
+      )}
+
+      {/* ── Save / Discard prompt ── */}
+      {showSavePrompt && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: '#1c1c1c', borderRadius: 20, padding: '28px 24px 24px', width: '100%', maxWidth: 320, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>💾</div>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, marginBottom: 6 }}>Save changes?</p>
+            <p style={{ color: '#666', fontSize: 13, marginBottom: 28, lineHeight: 1.5 }}>You have unsaved edits on this page.</p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={confirmDiscard}
+                style={{ flex: 1, background: 'none', border: '1px solid #444', borderRadius: 12, color: '#aaa', fontSize: 15, padding: '13px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent' }}>
+                Discard
+              </button>
+              <button onClick={confirmSaveAndBack} disabled={saving}
+                style={{ flex: 1, background: '#16a34a', border: 'none', borderRadius: 12, color: 'white', fontSize: 15, fontWeight: 600, padding: '13px 0', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
