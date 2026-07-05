@@ -122,7 +122,7 @@ function LayoutPreview({ slots }) {
   )
 }
 
-const divider = <div style={{ width: 1, height: 18, background: '#333', flexShrink: 0 }} />
+const divider = <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
 
 export default function PageEditor({ album, page, onSave, onCancel }) {
   const [elements, setElements] = useState(page.elements || [])

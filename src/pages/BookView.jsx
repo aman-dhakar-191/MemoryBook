@@ -188,9 +188,8 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
       <input {...getCoverInputProps()} />
 
       {/* Top bar */}
-      <div style={{ display: 'flex', flexDirection: 'column', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-        {/* Row 1: Back | Title | Cover */}
-        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 12px', gap: 8 }}>
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', padding: '8px 10px', gap: 6 }}>
           <button onClick={onBack} style={{ color: '#fbbf24', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
             ← Albums
           </button>
@@ -199,54 +198,46 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             style={{
               flex: 1, textAlign: 'center',
               fontFamily: 'Inter, sans-serif', fontWeight: 600,
-              color: '#fde68a', fontSize: 17,
+              color: '#fde68a', fontSize: 16,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              padding: '0 4px',
             }}
           >
             {album.title}
           </span>
-          <button
-            onClick={openCoverPicker}
-            disabled={uploadingCover}
-            style={{
-              fontSize: 11, color: '#c9a878',
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 6, padding: '4px 9px', cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            {uploadingCover ? '↑…' : '🖼️ Cover'}
-          </button>
-        </div>
-        {/* Row 2: secondary actions (right-aligned) */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', padding: '0 12px 8px', gap: 8 }}>
-          {deleteError && (
-            <span style={{ fontSize: 11, color: '#fca5a5', flex: 1 }}>⚠️ {deleteError}</span>
-          )}
           {confirmDelete ? (
             <>
               <button onClick={handleDeleteAlbum} disabled={deleting}
-                style={{ fontSize: 11, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer' }}>
-                {deleting ? 'Deleting…' : 'Confirm'}
+                style={{ fontSize: 12, color: '#fff', background: '#dc2626', border: 'none', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}>
+                {deleting ? 'Deleting…' : 'Confirm Delete'}
               </button>
               <button onClick={() => setConfirmDelete(false)}
-                style={{ fontSize: 11, color: '#aaa', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}>
+                style={{ fontSize: 12, color: '#aaa', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 10px', cursor: 'pointer', flexShrink: 0 }}>
                 Cancel
               </button>
             </>
           ) : (
             <>
-              <button onClick={() => setConfirmDelete(true)}
-                style={{ fontSize: 11, color: '#f87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer' }}>
-                🗑 Delete
-              </button>
               <button onClick={handleAddPage}
-                style={{ fontSize: 11, color: '#fde68a', background: 'rgba(180,120,60,0.35)', border: '1px solid rgba(180,120,60,0.4)', borderRadius: 6, padding: '5px 11px', cursor: 'pointer' }}>
+                style={{ fontSize: 12, color: '#fde68a', background: 'rgba(180,120,60,0.35)', border: '1px solid rgba(180,120,60,0.4)', borderRadius: 6, padding: '6px 12px', cursor: 'pointer', flexShrink: 0 }}>
                 + Add Page
+              </button>
+              <button onClick={openCoverPicker} disabled={uploadingCover}
+                title="Set cover photo"
+                style={{ fontSize: 16, color: '#c9a878', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>
+                {uploadingCover ? '↑' : '🖼️'}
+              </button>
+              <button onClick={() => setConfirmDelete(true)}
+                title="Delete album"
+                style={{ fontSize: 16, color: '#f87171', background: 'none', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', flexShrink: 0, lineHeight: 1 }}>
+                🗑
               </button>
             </>
           )}
         </div>
+        {deleteError && (
+          <div style={{ fontSize: 11, color: '#fca5a5', padding: '0 12px 6px' }}>⚠️ {deleteError}</div>
+        )}
       </div>
 
       {/* Book */}
@@ -297,7 +288,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             ) : (
               pages.map((page, i) => (
                 <FlipPage key={page.id} style={{ background: page.background || '#fffdf8', position: 'relative' }}>
-                  <BookPage page={page} pageNumber={i + 1} canvasW={PAGE_W} canvasH={PAGE_H} onEdit={() => openPageEditor(page)} />
+                  <BookPage page={page} pageNumber={i + 1} canvasW={PAGE_W} canvasH={PAGE_H} />
                 </FlipPage>
               ))
             )}
