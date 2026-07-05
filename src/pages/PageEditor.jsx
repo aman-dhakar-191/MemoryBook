@@ -263,13 +263,26 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setSelectedId(el.id); setShowStickers(false)
   }
 
+  // Strip placeholder slots — they're edit-time UI only, not persistent data
+  const saveableElements = () => elements.filter(e => e.type !== 'placeholder')
+
   async function handleSave() {
     document.activeElement?.blur()
     setSaving(true); setTextOverlayId(null)
     try {
-      await updatePage(album.id, page.id, { elements, background })
-      onSave({ ...page, elements, background })
+      const els = saveableElements()
+      await updatePage(album.id, page.id, { elements: els, background })
+      onSave()
     } finally { setSaving(false) }
+  }
+
+  // Auto-save on back — fire-and-forget so navigation is instant
+  function handleBack() {
+    document.activeElement?.blur()
+    setTextOverlayId(null)
+    const els = saveableElements()
+    updatePage(album.id, page.id, { elements: els, background }).catch(console.error)
+    onSave()
   }
 
   // ── Gesture system (replaces react-rnd) ───────────────────────────────────
@@ -504,7 +517,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
 
       {/* ── Toolbar ── */}
       <div data-toolbar style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
-        <button onClick={onCancel} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>← Back</button>
+        <button onClick={handleBack} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>← Back</button>
         <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, overflowX: 'auto', padding: '0 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <button onClick={open} disabled={uploading} style={btn({ background: '#1d4ed8', color: 'white', opacity: uploading ? 0.6 : 1 })}>

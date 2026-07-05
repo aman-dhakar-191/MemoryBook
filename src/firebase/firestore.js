@@ -1,6 +1,6 @@
 import {
   collection, addDoc, updateDoc, deleteDoc,
-  doc, getDocs, orderBy, query, serverTimestamp,
+  doc, getDocs, onSnapshot, orderBy, query, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from './config'
 
@@ -31,6 +31,12 @@ export async function getPages(albumId) {
     query(collection(db, 'albums', albumId, 'pages'), orderBy('order', 'asc'))
   )
   return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+// Real-time subscription — returns unsubscribe fn
+export function subscribePages(albumId, onUpdate) {
+  const q = query(collection(db, 'albums', albumId, 'pages'), orderBy('order', 'asc'))
+  return onSnapshot(q, snap => onUpdate(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
 }
 
 export async function addPage(albumId, order) {
