@@ -27,6 +27,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
   const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -80,9 +81,13 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
 
   async function handleDeleteAlbum() {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await deleteAlbumWithPages(album.id)
       onBack()
+    } catch (err) {
+      setDeleteError('Delete failed — check your connection')
+      setConfirmDelete(false)
     } finally {
       setDeleting(false)
     }
@@ -152,6 +157,9 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {deleteError && (
+            <span style={{ fontSize: 11, color: '#fca5a5' }}>⚠️ {deleteError}</span>
+          )}
           {confirmDelete ? (
             <>
               <button onClick={handleDeleteAlbum} disabled={deleting}
