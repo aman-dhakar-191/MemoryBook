@@ -261,7 +261,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             drawShadow
             maxShadowOpacity={0.6}
             style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
-            onInit={e => setCurrentFlipPage(e.data)}
+            onInit={e => { if (typeof e.data === 'number') setCurrentFlipPage(e.data) }}
             onFlip={handleFlip}
           >
             <FlipPage style={{ background: '#7c3a1e', position: 'relative' }}>
