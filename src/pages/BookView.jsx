@@ -16,18 +16,21 @@ const FlipPage = React.forwardRef(({ children, style }, ref) => (
 ))
 FlipPage.displayName = 'FlipPage'
 
-export default function BookView({ album, onBack, onAlbumUpdate, initialEditPageId, onEditorPageCleared }) {
+export default function BookView({ album, onBack, onAlbumUpdate, initialEditPageId, initialPageIndex = 0, onEditorPageCleared }) {
   const bookRef = useRef()
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPage, setEditingPage] = useState(null)
   const pendingEditPageIdRef = useRef(initialEditPageId)
+  const pendingPageIndexRef = useRef(initialPageIndex)
   const [coverUrl, setCoverUrl] = useState(album.coverUrl || null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
+  const [currentFlipPage, setCurrentFlipPage] = useState(initialPageIndex)
+  const returnPageRef = useRef(initialPageIndex)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -40,27 +43,59 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     const unsub = subscribePages(album.id, pages => {
       setPages(pages)
       setLoading(false)
-      // Restore editor state from URL (e.g. after reload on edit page)
+      // Restore editor state from URL
       if (pendingEditPageIdRef.current) {
         const page = pages.find(p => p.id === pendingEditPageIdRef.current)
         if (page) {
-          openPageEditor(page)
+          openPageEditor(page, pages)
           pendingEditPageIdRef.current = null
           onEditorPageCleared?.()
         }
+      }
+      // Jump to saved page index on first load
+      if (pendingPageIndexRef.current > 0) {
+        const target = pendingPageIndexRef.current
+        pendingPageIndexRef.current = 0
+        setTimeout(() => {
+          bookRef.current?.pageFlip().flip(target)
+        }, 80)
       }
     })
     return unsub
   }, [album.id])
 
-  function openPageEditor(page) {
+  // Update URL (replaceState — no history entry per flip) and currentFlipPage state
+  function handleFlip(e) {
+    const page = e.data
+    setCurrentFlipPage(page)
+    history.replaceState(
+      { albumId: album.id, pageIndex: page },
+      '',
+      `#/${album.id}${page > 0 ? `/${page}` : ''}`
+    )
+  }
+
+  function openPageEditor(page, pagesArr) {
+    const list = pagesArr || pages
+    const pageIdx = list.findIndex(p => p.id === page.id)
+    returnPageRef.current = pageIdx >= 0 ? pageIdx + 1 : currentFlipPage
     history.pushState({ albumId: album.id, pageId: page.id }, '', `#/${album.id}/edit/${page.id}`)
     setEditingPage(page)
   }
 
   function closeEditor() {
-    history.pushState({ albumId: album.id }, '', `#/${album.id}`)
+    const target = returnPageRef.current
+    history.pushState(
+      { albumId: album.id, pageIndex: target },
+      '',
+      `#/${album.id}${target > 0 ? `/${target}` : ''}`
+    )
     setEditingPage(null)
+    setTimeout(() => {
+      if (bookRef.current && target > 0) {
+        bookRef.current.pageFlip().flip(target)
+      }
+    }, 80)
   }
 
   async function handleAddPage() {
@@ -73,10 +108,29 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     if (!editingPage) return
     const onPop = () => {
       const hash = window.location.hash
-      if (!hash.includes('/edit/')) setEditingPage(null)
+      if (!hash.includes('/edit/')) {
+        setEditingPage(null)
+        const target = returnPageRef.current
+        setTimeout(() => {
+          if (bookRef.current && target > 0) {
+            bookRef.current.pageFlip().flip(target)
+          }
+        }, 80)
+      }
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
+  }, [editingPage])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (editingPage) return
+    const onKey = e => {
+      if (e.key === 'ArrowLeft') bookRef.current?.pageFlip().flipPrev()
+      else if (e.key === 'ArrowRight') bookRef.current?.pageFlip().flipNext()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [editingPage])
 
   async function handleDeleteAlbum() {
@@ -113,6 +167,10 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     noClick: true,
     maxFiles: 1,
   })
+
+  const currentPageObj = currentFlipPage > 0 && currentFlipPage <= pages.length
+    ? pages[currentFlipPage - 1]
+    : null
 
   if (editingPage) {
     return (
@@ -203,6 +261,8 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             drawShadow
             maxShadowOpacity={0.6}
             style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
+            onInit={e => setCurrentFlipPage(e.data)}
+            onFlip={handleFlip}
           >
             <FlipPage style={{ background: '#7c3a1e', position: 'relative' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)', zIndex: 1 }} />
@@ -244,12 +304,59 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
         )}
       </div>
 
-      {/* Nav */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 20, padding: '12px 0 20px', flexShrink: 0 }}>
-        <button onClick={() => bookRef.current?.pageFlip().flipPrev()}
-          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}>◄ Prev</button>
-        <button onClick={() => bookRef.current?.pageFlip().flipNext()}
-          style={{ background: 'rgba(120,70,30,0.4)', color: '#fde68a', border: '1px solid rgba(180,120,60,0.3)', borderRadius: 24, padding: '9px 28px', fontSize: 13, cursor: 'pointer' }}>Next ►</button>
+      {/* Bottom nav */}
+      <div style={{
+        display: 'flex', alignItems: 'stretch', flexShrink: 0,
+        background: 'rgba(10,5,2,0.85)', borderTop: '1px solid rgba(255,255,255,0.07)',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        minHeight: 64,
+      }}>
+        <button
+          onClick={() => bookRef.current?.pageFlip().flipPrev()}
+          style={{
+            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            color: '#fde68a', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderRight: '1px solid rgba(255,255,255,0.07)',
+          }}
+        >◄</button>
+
+        <div style={{
+          flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 4, padding: '8px 12px',
+        }}>
+          <span style={{ color: 'rgba(253,230,138,0.55)', fontSize: 11, letterSpacing: '0.04em' }}>
+            {pages.length === 0
+              ? 'Cover'
+              : currentFlipPage === 0
+                ? 'Cover'
+                : currentFlipPage > pages.length
+                  ? 'Back cover'
+                  : `Page ${currentFlipPage} / ${pages.length}`
+            }
+          </span>
+          {currentPageObj && (
+            <button
+              onClick={() => openPageEditor(currentPageObj)}
+              style={{
+                fontSize: 12, color: '#fde68a',
+                background: 'rgba(180,120,60,0.35)',
+                border: '1px solid rgba(180,120,60,0.45)',
+                borderRadius: 8, padding: '5px 16px', cursor: 'pointer',
+              }}
+            >
+              ✏️ Edit
+            </button>
+          )}
+        </div>
+
+        <button
+          onClick={() => bookRef.current?.pageFlip().flipNext()}
+          style={{
+            flex: 1, background: 'none', border: 'none', cursor: 'pointer',
+            color: '#fde68a', fontSize: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            borderLeft: '1px solid rgba(255,255,255,0.07)',
+          }}
+        >►</button>
       </div>
     </div>
   )
