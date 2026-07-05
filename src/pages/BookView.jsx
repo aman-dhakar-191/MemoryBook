@@ -16,19 +16,20 @@ const FlipPage = React.forwardRef(({ children, style }, ref) => (
 ))
 FlipPage.displayName = 'FlipPage'
 
-export default function BookView({ album, onBack, onAlbumUpdate, initialEditPageId, onEditorPageCleared }) {
+export default function BookView({ album, onBack, onAlbumUpdate, initialEditPageId, initialPageIndex = 0, onEditorPageCleared }) {
   const bookRef = useRef()
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingPage, setEditingPage] = useState(null)
   const pendingEditPageIdRef = useRef(initialEditPageId)
+  const pendingPageIndexRef = useRef(initialPageIndex)
   const [coverUrl, setCoverUrl] = useState(album.coverUrl || null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 700)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [currentFlipPage, setCurrentFlipPage] = useState(0)
-  const returnPageRef = useRef(0)
+  const [currentFlipPage, setCurrentFlipPage] = useState(initialPageIndex)
+  const returnPageRef = useRef(initialPageIndex)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -41,7 +42,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     const unsub = subscribePages(album.id, pages => {
       setPages(pages)
       setLoading(false)
-      // Restore editor state from URL (e.g. after reload on edit page)
+      // Restore editor state from URL
       if (pendingEditPageIdRef.current) {
         const page = pages.find(p => p.id === pendingEditPageIdRef.current)
         if (page) {
@@ -50,24 +51,45 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
           onEditorPageCleared?.()
         }
       }
+      // Jump to saved page index on first load
+      if (pendingPageIndexRef.current > 0) {
+        const target = pendingPageIndexRef.current
+        pendingPageIndexRef.current = 0
+        setTimeout(() => {
+          bookRef.current?.pageFlip().flip(target)
+        }, 80)
+      }
     })
     return unsub
   }, [album.id])
 
+  // Update URL (replaceState — no history entry per flip) and currentFlipPage state
+  function handleFlip(e) {
+    const page = e.data
+    setCurrentFlipPage(page)
+    history.replaceState(
+      { albumId: album.id, pageIndex: page },
+      '',
+      `#/${album.id}${page > 0 ? `/${page}` : ''}`
+    )
+  }
+
   function openPageEditor(page, pagesArr) {
     const list = pagesArr || pages
     const pageIdx = list.findIndex(p => p.id === page.id)
-    // +1 because cover is index 0 in the flipbook
     returnPageRef.current = pageIdx >= 0 ? pageIdx + 1 : currentFlipPage
     history.pushState({ albumId: album.id, pageId: page.id }, '', `#/${album.id}/edit/${page.id}`)
     setEditingPage(page)
   }
 
   function closeEditor() {
-    history.pushState({ albumId: album.id }, '', `#/${album.id}`)
-    setEditingPage(null)
-    // Restore flipbook to the page that was being edited
     const target = returnPageRef.current
+    history.pushState(
+      { albumId: album.id, pageIndex: target },
+      '',
+      `#/${album.id}${target > 0 ? `/${target}` : ''}`
+    )
+    setEditingPage(null)
     setTimeout(() => {
       if (bookRef.current && target > 0) {
         bookRef.current.pageFlip().flip(target)
@@ -97,6 +119,17 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
+  }, [editingPage])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (editingPage) return
+    const onKey = e => {
+      if (e.key === 'ArrowLeft') bookRef.current?.pageFlip().flipPrev()
+      else if (e.key === 'ArrowRight') bookRef.current?.pageFlip().flipNext()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [editingPage])
 
   async function handleDeleteAlbum() {
@@ -130,8 +163,6 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     maxFiles: 1,
   })
 
-  // Current page in the flipbook (0 = cover). Pages are 1-indexed after cover.
-  // pageIndex within pages[] = currentFlipPage - 1
   const currentPageObj = currentFlipPage > 0 && currentFlipPage <= pages.length
     ? pages[currentFlipPage - 1]
     : null
@@ -223,7 +254,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             maxShadowOpacity={0.6}
             style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }}
             onInit={e => setCurrentFlipPage(e.data)}
-            onFlip={e => setCurrentFlipPage(e.data)}
+            onFlip={handleFlip}
           >
             <FlipPage style={{ background: '#7c3a1e', position: 'relative' }}>
               <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 14, background: 'rgba(0,0,0,0.4)', zIndex: 1 }} />
@@ -265,14 +296,13 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
         )}
       </div>
 
-      {/* Bottom nav — accessible with page indicator and Edit button */}
+      {/* Bottom nav */}
       <div style={{
         display: 'flex', alignItems: 'stretch', flexShrink: 0,
         background: 'rgba(10,5,2,0.85)', borderTop: '1px solid rgba(255,255,255,0.07)',
         paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
         minHeight: 64,
       }}>
-        {/* Prev */}
         <button
           onClick={() => bookRef.current?.pageFlip().flipPrev()}
           style={{
@@ -282,7 +312,6 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
           }}
         >◄</button>
 
-        {/* Center: page indicator + Edit */}
         <div style={{
           flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 4, padding: '8px 12px',
@@ -312,7 +341,6 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
           )}
         </div>
 
-        {/* Next */}
         <button
           onClick={() => bookRef.current?.pageFlip().flipNext()}
           style={{
