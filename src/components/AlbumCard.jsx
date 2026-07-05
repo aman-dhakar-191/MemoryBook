@@ -43,6 +43,7 @@ export default function AlbumCard({ album, onClick }) {
             <p
               className="text-white text-sm font-semibold truncate"
               style={{ fontFamily: 'Playfair Display, serif' }}
+              title={album.title}
             >
               {album.title}
             </p>
