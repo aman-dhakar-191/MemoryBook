@@ -34,6 +34,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
   const [jumpMode, setJumpMode] = useState(false)
   const [jumpInput, setJumpInput] = useState('')
   const jumpInputRef = useRef(null)
+  const jumpHoldTimer = useRef(null)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -150,17 +151,25 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     }
   }
 
-  function openJump() {
+  function startJumpHold() {
     if (pages.length === 0 || currentFlipPage < 1 || currentFlipPage > pages.length) return
-    setJumpInput(String(currentFlipPage))
-    setJumpMode(true)
-    setTimeout(() => jumpInputRef.current?.select(), 0)
+    jumpHoldTimer.current = setTimeout(() => {
+      setJumpInput(String(currentFlipPage))
+      setJumpMode(true)
+      setTimeout(() => jumpInputRef.current?.select(), 0)
+    }, 500)
+  }
+
+  function cancelJumpHold() {
+    clearTimeout(jumpHoldTimer.current)
   }
 
   function commitJump() {
     const n = parseInt(jumpInput, 10)
     if (!isNaN(n) && n >= 1 && n <= pages.length) {
-      bookRef.current?.pageFlip().flip(n)
+      // react-pageflip's internal index includes cover + implicit spread pages,
+      // so the visual page N sits at flip index N - 2
+      bookRef.current?.pageFlip().flip(Math.max(0, n - 2))
     }
     setJumpMode(false)
   }
@@ -364,11 +373,14 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
             </div>
           ) : (
             <span
-              onClick={openJump}
+              onPointerDown={startJumpHold}
+              onPointerUp={cancelJumpHold}
+              onPointerLeave={cancelJumpHold}
+              onPointerCancel={cancelJumpHold}
               style={{
                 color: 'rgba(253,230,138,0.55)', fontSize: 11, letterSpacing: '0.04em',
+                userSelect: 'none', WebkitUserSelect: 'none',
                 cursor: pages.length > 0 && currentFlipPage >= 1 && currentFlipPage <= pages.length ? 'pointer' : 'default',
-                userSelect: 'none',
               }}
             >
               {pages.length === 0
