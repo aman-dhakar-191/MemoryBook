@@ -6,6 +6,7 @@ export function uploadPhoto(file, onProgress, folder) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', uploadPreset)
+    formData.append('return_delete_token', 'true')
     if (folder) formData.append('folder', folder)
 
     const xhr = new XMLHttpRequest()
@@ -21,7 +22,7 @@ export function uploadPhoto(file, onProgress, folder) {
       if (xhr.status === 200) {
         try {
           const data = JSON.parse(xhr.responseText)
-          resolve({ url: data.secure_url, path: data.public_id })
+          resolve({ url: data.secure_url, path: data.public_id, deleteToken: data.delete_token })
         } catch {
           reject(new Error('Invalid response from server'))
         }
@@ -39,6 +40,15 @@ export function uploadPhoto(file, onProgress, folder) {
   })
 }
 
-// Cloudinary unsigned deletes require server-side auth — photos are orphaned
-// when a memory is deleted but storage cost is negligible for personal use.
-export async function deletePhoto(_publicId) {}
+// Delete a previously uploaded photo using the token returned at upload time.
+// No API secret needed — Cloudinary's delete_by_token is designed for client-side use.
+export async function deletePhoto(token) {
+  if (!token) return
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+  const resp = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/delete_by_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  })
+  if (!resp.ok) throw new Error(`Delete failed (HTTP ${resp.status})`)
+}
