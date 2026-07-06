@@ -1,4 +1,4 @@
-export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH }) {
+export default function BookPage({ page, pageNumber, canvasW, canvasH }) {
   return (
     <div style={{ position: 'relative', width: canvasW, height: canvasH, overflow: 'hidden', background: page.background || '#fffdf8', fontFamily: 'Inter, sans-serif' }}>
       {(page.elements || []).map(el => (
@@ -32,10 +32,6 @@ export default function BookPage({ page, pageNumber, onEdit, canvasW, canvasH })
       <div style={{ position: 'absolute', bottom: 10, width: '100%', textAlign: 'center', fontSize: 10, color: '#ccc', letterSpacing: '0.08em', pointerEvents: 'none' }}>
         {pageNumber}
       </div>
-      <button onClick={onEdit}
-        style={{ position: 'absolute', bottom: 16, right: 12, background: 'rgba(0,0,0,0.55)', color: '#fff', border: 'none', borderRadius: 18, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-        ✏️ Edit
-      </button>
     </div>
   )
 }

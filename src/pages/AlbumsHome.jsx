@@ -24,36 +24,36 @@ export default function AlbumsHome({ onOpen }) {
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #f5f0eb 0%, #ede4d6 100%)' }}>
       <header className="bg-white/80 backdrop-blur border-b border-amber-100 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
-          <div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-5 flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1
-              className="text-4xl font-bold text-gray-800"
+              className="text-2xl sm:text-4xl font-bold text-gray-800 truncate"
               style={{ fontFamily: 'Playfair Display, serif' }}
             >
               MemoryBook
             </h1>
-            <p className="text-sm text-gray-400 mt-0.5">Your photo albums</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5 hidden sm:block">Your photo albums</p>
           </div>
           <button
             onClick={() => setCreating(true)}
-            className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow"
+            className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm sm:text-base font-medium transition-colors shadow whitespace-nowrap"
           >
             + New Album
           </button>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-10">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         {loading ? (
           <p className="text-center text-gray-400 py-24">Loading…</p>
         ) : albums.length === 0 ? (
           <div className="text-center py-28">
             <div className="text-7xl mb-4">📚</div>
             <p className="text-gray-500 text-lg font-medium">No albums yet</p>
-            <p className="text-gray-400 text-sm mt-1">Click “New Album” to create your first memory book.</p>
+            <p className="text-gray-400 text-sm mt-1">Tap "+ New Album" to create your first memory book.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-8">
             {albums.map(a => (
               <AlbumCard key={a.id} album={a} onClick={() => onOpen(a)} />
             ))}
