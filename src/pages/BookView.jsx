@@ -167,7 +167,9 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
   function commitJump() {
     const n = parseInt(jumpInput, 10)
     if (!isNaN(n) && n >= 1 && n <= pages.length) {
-      bookRef.current?.pageFlip().flip(n)
+      // react-pageflip's internal index includes cover + implicit spread pages,
+      // so the visual page N sits at flip index N - 2
+      bookRef.current?.pageFlip().flip(Math.max(0, n - 2))
     }
     setJumpMode(false)
   }
