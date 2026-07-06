@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { v4 as uuid } from 'uuid'
 import { updatePage } from '../firebase/firestore'
-import { uploadPhoto, deletePhoto } from '../firebase/storage'
+import { uploadPhoto } from '../firebase/storage'
 
 const PAGE_W = 460
 const PAGE_H = 640
@@ -165,10 +165,6 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     setElements(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))
   }
   function deleteSelected() {
-    const el = elements.find(e => e.id === selectedId)
-    if (el?.type === 'photo' && el.deleteToken) {
-      deletePhoto(el.deleteToken).catch(() => {})
-    }
     setElements(prev => prev.filter(e => e.id !== selectedId))
     setSelectedId(null); setTextOverlayId(null)
   }
@@ -221,9 +217,9 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     e.target.value = ''
     setUploading(true)
     try {
-      const { url, path, deleteToken } = await uploadPhoto(file, null, `memorybook/${album.id}`)
+      const { url, path } = await uploadPhoto(file, null, `memorybook/${album.id}`)
       setElements(prev => prev.map(el =>
-        el.id === id ? { ...el, type: 'photo', imageUrl: url, storagePath: path, deleteToken, frame: 'none', filter: 'none' } : el
+        el.id === id ? { ...el, type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none' } : el
       ))
     } finally { setUploading(false); placeholderTarget.current = null }
   }
@@ -237,13 +233,13 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
     try {
       for (let i = 0; i < accepted.length; i++) {
         try {
-          const { url, path, deleteToken } = await uploadPhoto(accepted[i], null, `memorybook/${album.id}`)
+          const { url, path } = await uploadPhoto(accepted[i], null, `memorybook/${album.id}`)
           const { w, h } = await getImageDimensions(url)
           const ratio = w / h
           const maxW = 240, maxH = 220
           let elW = maxW, elH = maxW / ratio
           if (elH > maxH) { elH = maxH; elW = maxH * ratio }
-          newEls.push({ id: uuid(), type: 'photo', imageUrl: url, storagePath: path, deleteToken, frame: 'none', filter: 'none', x: 30 + i * 22, y: 30 + i * 22, width: Math.round(elW), height: Math.round(elH), rotation: 0 })
+          newEls.push({ id: uuid(), type: 'photo', imageUrl: url, storagePath: path, frame: 'none', filter: 'none', x: 30 + i * 22, y: 30 + i * 22, width: Math.round(elW), height: Math.round(elH), rotation: 0 })
           setUploadCount({ done: i + 1, total: accepted.length })
         } catch (err) {
           setSaveError(`Photo ${i + 1} failed to upload: ${err.message}`)

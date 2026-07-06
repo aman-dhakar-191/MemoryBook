@@ -6,7 +6,6 @@ export function uploadPhoto(file, onProgress, folder) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('upload_preset', uploadPreset)
-    formData.append('return_delete_token', 'true')
     if (folder) formData.append('folder', folder)
 
     const xhr = new XMLHttpRequest()
@@ -22,7 +21,7 @@ export function uploadPhoto(file, onProgress, folder) {
       if (xhr.status === 200) {
         try {
           const data = JSON.parse(xhr.responseText)
-          resolve({ url: data.secure_url, path: data.public_id, deleteToken: data.delete_token })
+          resolve({ url: data.secure_url, path: data.public_id })
         } catch {
           reject(new Error('Invalid response from server'))
         }
