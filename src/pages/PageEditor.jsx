@@ -561,7 +561,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
       {/* ── Toolbar ── */}
       <div data-toolbar style={{ display: 'flex', alignItems: 'center', background: '#1a1a1a', borderBottom: '1px solid #2a2a2a', flexShrink: 0, minHeight: 44 }}>
         <button onClick={handleBack} style={{ color: '#aaa', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', padding: '0 10px', flexShrink: 0, height: 44, display: 'flex', alignItems: 'center' }}>← Back</button>
-        <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, overflowX: 'auto', padding: '0 10px', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
           <button onClick={open} disabled={uploading} style={btn({ background: '#1d4ed8', color: 'white', opacity: uploading ? 0.6 : 1 })}>
             {uploading ? `↑${uploadCount.done}/${uploadCount.total}` : '+ Photos'}
@@ -575,7 +575,7 @@ export default function PageEditor({ album, page, onSave, onCancel }) {
             🎨 BG
           </button>
         </div>
-        <div style={{ width: 1, height: 24, background: '#333', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.18)', flexShrink: 0 }} />
         <button onClick={handleSave} disabled={saving}
           style={{ background: '#16a34a', color: 'white', border: 'none', borderRadius: 0, fontSize: 13, fontWeight: 700, padding: '0 14px', cursor: 'pointer', height: 44, flexShrink: 0, opacity: saving ? 0.5 : 1 }}>
           {saving ? '✓…' : 'Save'}
