@@ -31,6 +31,9 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
   const [deleteError, setDeleteError] = useState(null)
   const [currentFlipPage, setCurrentFlipPage] = useState(initialPageIndex)
   const returnPageRef = useRef(initialPageIndex)
+  const [jumpMode, setJumpMode] = useState(false)
+  const [jumpInput, setJumpInput] = useState('')
+  const jumpInputRef = useRef(null)
 
   useEffect(() => {
     const handle = () => setIsMobile(window.innerWidth < 700)
@@ -145,6 +148,21 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     } finally {
       setDeleting(false)
     }
+  }
+
+  function openJump() {
+    if (pages.length === 0 || currentFlipPage < 1 || currentFlipPage > pages.length) return
+    setJumpInput(String(currentFlipPage))
+    setJumpMode(true)
+    setTimeout(() => jumpInputRef.current?.select(), 0)
+  }
+
+  function commitJump() {
+    const n = parseInt(jumpInput, 10)
+    if (!isNaN(n) && n >= 1 && n <= pages.length) {
+      bookRef.current?.pageFlip().flip(n)
+    }
+    setJumpMode(false)
   }
 
   const onCoverDrop = useCallback(async accepted => {
@@ -320,16 +338,49 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
           flex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 4, padding: '8px 12px',
         }}>
-          <span style={{ color: 'rgba(253,230,138,0.55)', fontSize: 11, letterSpacing: '0.04em' }}>
-            {pages.length === 0
-              ? 'Cover'
-              : currentFlipPage === 0
+          {jumpMode ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ color: 'rgba(253,230,138,0.45)', fontSize: 11 }}>Page</span>
+              <input
+                ref={jumpInputRef}
+                value={jumpInput}
+                onChange={e => setJumpInput(e.target.value.replace(/\D/g, ''))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitJump() }
+                  else if (e.key === 'Escape') setJumpMode(false)
+                }}
+                onBlur={commitJump}
+                inputMode="numeric"
+                style={{
+                  width: 36, textAlign: 'center',
+                  background: 'rgba(253,230,138,0.12)',
+                  border: '1px solid rgba(253,230,138,0.5)',
+                  borderRadius: 5, color: '#fde68a',
+                  fontSize: 13, fontWeight: 600,
+                  padding: '2px 4px', outline: 'none',
+                }}
+              />
+              <span style={{ color: 'rgba(253,230,138,0.45)', fontSize: 11 }}>/ {pages.length}</span>
+            </div>
+          ) : (
+            <span
+              onClick={openJump}
+              style={{
+                color: 'rgba(253,230,138,0.55)', fontSize: 11, letterSpacing: '0.04em',
+                cursor: pages.length > 0 && currentFlipPage >= 1 && currentFlipPage <= pages.length ? 'pointer' : 'default',
+                userSelect: 'none',
+              }}
+            >
+              {pages.length === 0
                 ? 'Cover'
-                : currentFlipPage > pages.length
-                  ? 'Back cover'
-                  : `Page ${currentFlipPage} / ${pages.length}`
-            }
-          </span>
+                : currentFlipPage === 0
+                  ? 'Cover'
+                  : currentFlipPage > pages.length
+                    ? 'Back cover'
+                    : `Page ${currentFlipPage} / ${pages.length}`
+              }
+            </span>
+          )}
           {currentPageObj && (
             <button
               onClick={() => openPageEditor(currentPageObj)}
