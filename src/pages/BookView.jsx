@@ -151,7 +151,8 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     }
   }
 
-  function startJumpHold() {
+  function startJumpHold(e) {
+    e.stopPropagation()
     if (pages.length === 0 || currentFlipPage < 1 || currentFlipPage > pages.length) return
     jumpHoldTimer.current = setTimeout(() => {
       setJumpInput(String(currentFlipPage))
@@ -160,16 +161,15 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
     }, 500)
   }
 
-  function cancelJumpHold() {
+  function cancelJumpHold(e) {
+    e?.stopPropagation()
     clearTimeout(jumpHoldTimer.current)
   }
 
   function commitJump() {
     const n = parseInt(jumpInput, 10)
     if (!isNaN(n) && n >= 1 && n <= pages.length) {
-      // react-pageflip's internal index includes cover + implicit spread pages,
-      // so the visual page N sits at flip index N - 2
-      bookRef.current?.pageFlip().flip(Math.max(0, n - 2))
+      bookRef.current?.pageFlip().flip(n)
     }
     setJumpMode(false)
   }
@@ -358,7 +358,7 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
                   if (e.key === 'Enter') { e.preventDefault(); commitJump() }
                   else if (e.key === 'Escape') setJumpMode(false)
                 }}
-                onBlur={commitJump}
+                onBlur={() => setJumpMode(false)}
                 inputMode="numeric"
                 style={{
                   width: 36, textAlign: 'center',
@@ -370,13 +370,24 @@ export default function BookView({ album, onBack, onAlbumUpdate, initialEditPage
                 }}
               />
               <span style={{ color: 'rgba(253,230,138,0.45)', fontSize: 11 }}>/ {pages.length}</span>
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={e => { e.stopPropagation(); commitJump() }}
+                style={{
+                  background: 'rgba(180,120,60,0.5)', border: '1px solid rgba(180,120,60,0.6)',
+                  borderRadius: 5, color: '#fde68a', fontSize: 12, fontWeight: 700,
+                  padding: '2px 7px', cursor: 'pointer', lineHeight: 1.4,
+                }}
+              >→</button>
             </div>
           ) : (
             <span
-              onPointerDown={startJumpHold}
-              onPointerUp={cancelJumpHold}
-              onPointerLeave={cancelJumpHold}
-              onPointerCancel={cancelJumpHold}
+              onTouchStart={startJumpHold}
+              onTouchEnd={cancelJumpHold}
+              onTouchCancel={cancelJumpHold}
+              onMouseDown={startJumpHold}
+              onMouseUp={cancelJumpHold}
+              onMouseLeave={cancelJumpHold}
               style={{
                 color: 'rgba(253,230,138,0.55)', fontSize: 11, letterSpacing: '0.04em',
                 userSelect: 'none', WebkitUserSelect: 'none',
